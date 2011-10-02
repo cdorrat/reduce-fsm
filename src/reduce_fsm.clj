@@ -14,13 +14,15 @@
 
 
 (defn- create-transition
-  "create a single transition make with default params if none specified"
+  "create a single transition make with default params if none specified.
+  the expected input is like: [[#\".*event c\"] [{:emit emit-event :action inc-matches}? :waiting-for-a\"]]"
   [[from to]]
   (let [has-params? (map? (first to))
-	{:keys [action]} (if has-params? (first to) {})
+	{:keys [action emit]} (if has-params? (first to) {})
 	to-state (if has-params? (second to) (first to))]
     {:evt (last from)
      :action action
+     :emit emit
      :to-state to-state}))
 
 (defn- create-state-map
@@ -161,9 +163,6 @@
 	target-pass-val (-> evt-map :to-state state-params :pass)
 	new-acc (gensym "new-acc")]   
     
-    (when (nil? target-state-fn)
-      (report-compile-error "The state %s was referenced in a transition from %s but does not exist" (:to-state evt-map) (str from-state)))
-
     `[~(:evt evt-map)
       (let [~new-acc ~(if (:action evt-map)
 			`(~(:action evt-map) ~acc ~evt ~(state-for-action from-state) ~(state-for-action (:to-state evt-map)))
@@ -228,15 +227,40 @@
   (defn emit-event [acc evt & _] evt)
   (defn inc-matches [acc & _] (inc acc))
 
-    
-  (defsm-seq my-seq [[:wating-for-a
+  ;; sample usage    
+  (defsm-seq my-seq [[:waiting-for-a
 		      #".*event a" -> :seen-a]
 		     [:seen-a
 		      #".*event b" -> :waiting-for-c
-		      #".*event c" -> {:emit emit-event :action inc-matches} :wating-for-a]
+		      #".*event c" -> {:emit emit-event :action inc-matches} :waiting-for-a]
 		     [:waiting-for-c
-		      #".*event c" -> waiting-for-a]])
+		      #".*event c" -> :waiting-for-a]])
   (take 10 (my-seq (ds/read-lines "afile.txt")))
+  
+  (defn sample-seq-expansion [acc events]
+    (letfn [(emit-event [acc evt] evt)
+	    (inc-matches [acc & _] (inc acc))
+	    (state-waiting-for-a [acc events]			       
+				 (if (seq events)
+				   #(match [(first events)]
+					   [#".*event a"] [::no-event (state-seen-a acc (rest events))]
+					   :else [::no-event (state-waiting-for-a acc (rest events))])
+				   nil))
+	    (state-seen-a [acc events]
+			  (if (seq events)
+			    #(match [(first events)]
+				    [#".*event b"] [::no-event (state-waiting-for-c acc (rest events))]
+				    [#".*event c"] [(emit-event acc (first events)) (state-waiting-for-a (inc-matches acc (first events) :seen-a :waiting-for-a) (rest events))]
+				    :else [::no-event (state-seen-a acc (rest events))])
+			    nil))
+	    (state-waiting-for-c [acc events]
+				 (if (seq events)
+				   #(match [(first events)]
+					   [#".*event c"] [::no-event (state-waiting-for-a acc (rest events))]
+					   :else [::no-event (state-waiting-for-c acc (rest events))])
+				   nil))]
+      (when (seq events)
+	(fsm-seq-impl (state-waiting-for-a acc events)))))  
   )
 
 
@@ -258,35 +282,51 @@
 	 (cons emitted nil))))))
 
 
-(defn sample-seq-expansion [acc events]
-  (letfn [(emit-event [acc evt] evt)
-	  (inc-matches [acc & _] (inc acc))
-	  (state-waiting-for-a [acc events]			       
-				(if (seq events)
-				  #(match [(first events)]
-					  [#".*event a"] [::no-event (state-seen-a acc (rest events))]
-					  :else [::no-event (state-waiting-for-a acc (rest events))])
-				   nil))
- 	  (state-seen-a [acc events]
- 			(if (seq events)
- 			  #(match [(first events)]
- 				  [#".*event b"] [::no-event (state-waiting-for-c acc (rest events))]
- 				  [#".*event c"] [(emit-event acc (first events)) (state-waiting-for-a (inc-matches acc (first events) :seen-a :waiting-for-a) (rest events))]
- 				  :else [::no-event (state-seen-a acc (rest events))])
- 			  nil))
- 	  (state-waiting-for-c [acc events]
- 			       (if (seq events)
- 				 #(match [(first events)]
- 					 [#".*event c"] [::no-event (state-waiting-for-a acc (rest events))]
-					 :else [::no-event (state-waiting-for-c acc (rest events))])
-				 nil))]
-    ;;    ((state-waiting-for-a 0 ["1 event a" "2 event b" "3 event c" "4 event a" "5 event c" "6 event a"]))))
-    (when (seq events)
-      (fsm-seq-impl (state-waiting-for-a acc events)))))
+
+(defn- expand-seq-evt-dispatch [state-fn-map state-params from-state evt acc evt-map]
+  (let [target-state-fn (state-fn-map (:to-state evt-map))
+	target-pass-val (-> evt-map :to-state state-params :pass)
+	new-acc (gensym "new-acc")]       
+
+    `[~(:evt evt-map)
+      (let [emitted# ~(if (:emit evt-map)
+			`(~(:emit evt-map) ~acc (first ~evt))
+			`::no-event)
+	    ~new-acc ~(if (:action evt-map)
+			`(~(:action evt-map) ~acc (first ~evt) ~(state-for-action from-state) ~(state-for-action (:to-state evt-map)))
+			acc)]
+	[emitted# (~target-state-fn ~new-acc (rest ~evt))])]))
 
 
-  
+(defn- state-seq-fn-impl [dispatch-type state-fn-map state-params state]
+  (let [this-state-fn  (state-fn-map (:from-state state))
+	acc (gensym "acc")
+	evt (gensym "evt")] 
+    `(~this-state-fn
+      [~acc ~evt]
+      (when (seq ~evt)
+	#(~@(expand-dispatch dispatch-type `(first ~evt) acc)
+	 ~@(mapcat (partial expand-seq-evt-dispatch state-fn-map state-params (:from-state state) evt acc) (:transitions state))
+	 :else [::no-event (~this-state-fn ~acc (rest ~evt))]
+	)))))
 
+(defmacro fsm-seq [states & fsm-opts]
+  (let [{:keys [dispatch] :or {dispatch :event-only}} fsm-opts 
+	state-maps  (create-state-maps states)
+	state-fn-names (map state-fn-name (map :from-state state-maps))
+	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
+	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name
+    `(letfn [~@(map #(state-seq-fn-impl dispatch state-fn-map state-params %) state-maps)]
+       (with-meta
+	 (fn fsm-seq-fn#
+	   ([events#] (fsm-seq-fn# nil events#))
+	   ([acc# events#]
+	      (when (seq events#)
+		(fsm-seq-impl (~(first state-fn-names) acc# events#)))))
+	 ~(fsm-metadata state-maps)))))
+
+(defmacro defsm-seq [name states & fsm-opts]
+  `(def ~name (fsm-seq states ~@fsm-opts)))
 
 
 ;; ===================================================================================================

@@ -5,7 +5,7 @@
 (defn- test-save-line [state evt from-state to-state]
   (conj state evt))
 
-(defsm log-search-fsm
+(defsm log-search-fsm-test
   [[:waiting-for-a
     #".*event a" -> :waiting-for-b]
    [:waiting-for-b
@@ -17,7 +17,7 @@
 
 (deftest simple-fsm-behaviour
   
-  (are [res acc events] (= res (log-search-fsm acc events))       
+  (are [res acc events] (= res (log-search-fsm-test acc events))       
        ["5 event c"]  []  ["1 event a" "event x" "2 event b" "3 event c" "4 event a" "event x" "5 event c" "6 event a"]
        nil nil ["0 event c" "1 event a" "2 event b" "3 event c"]
        [] [] ["0 event c" "1 event a" "2 event b" "3 event c" ]))
@@ -26,14 +26,14 @@
 (deftest dispatch-with-acc
   (let [an-fsm (fsm
 		[[:waiting-for-a
-		  [#".*event a" _] -> :waiting-for-b]
+		  [_ #".*event a"] -> :waiting-for-b]
 		 [:waiting-for-b
-		  [#".*event b" _] -> :waiting-for-c
-		  [#".*event c" _] -> {:action test-save-line} :waiting-for-a]
+		  [_ #".*event b"] -> :waiting-for-c
+		  [_ #".*event c"] -> {:action test-save-line} :waiting-for-a]
 		 [:waiting-for-c
-		  [#".*event c" _] -> :waiting-for-a]] :dispatch :event-and-acc)]
+		  [_ #".*event c"] -> :waiting-for-a]] :dispatch :event-and-acc)]
 
-  (are [res acc events] (= res (log-search-fsm acc events))       
+  (are [res acc events] (= res (an-fsm acc events))       
        ["5 event c"]  []  ["1 event a" "event x" "2 event b" "3 event c" "4 event a" "event x" "5 event c" "6 event a"]
        nil nil ["0 event c" "1 event a" "2 event b" "3 event c"]
        [] [] ["0 event c" "1 event a" "2 event b" "3 event c" ])
@@ -53,7 +53,7 @@
 
 
 (deftest display-dorothy-fsm-test
-  (let [frame (#'reduce-fsm/show-dorothy-fsm log-search-fsm)]
+  (let [frame (#'reduce-fsm/show-dorothy-fsm log-search-fsm-test)]
     (is (not (nil? frame)))
     (when frame
       (.dispose frame))
@@ -72,6 +72,23 @@
 ;;(deftest fsm-with-guards
 ;;  (is false "write test for fsm that guard transitions"))
 
+(deftest simple-fsm-seq
+  (let [emit-evt (fn [acc evt] evt)
+	log-seq (fsm-seq 
+		 [[:waiting-for-a
+		   #".*event a" -> :waiting-for-b]
+		  [:waiting-for-b
+		   #".*event b" -> :waiting-for-c
+		   #".*event c" -> {:emit emit-evt} :waiting-for-a]
+		  [:waiting-for-c
+		   #".*event c" -> :waiting-for-a]])]
+
+    
+    (are [res events] (= res (doall (log-seq [] events)))
+	 ["5 event c"]  ["1 event a" "event x" "2 event b" "3 event c" "4 event a" "event x" "5 event c" "6 event a"]
+	 []  ["1 event a" "2 event b" "3 event c"]
+	 ["2 event c" "4 event c"]  ["x na-event" "1 event a" "2 event c" "3 event a" "4 event c"])))
+  
 ;;===================================================================================================
 ;; fsm-filter tests
 

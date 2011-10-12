@@ -362,6 +362,7 @@
     (catch Exception e false)))
 
 (defmulti show-fsm "show the fsm using graphviz if available, vijual if it's not" (memoize dot-exists))
+(defmulti save-fsm-image "save the state transition diagram for an fsm as a png. Expects an fsm and filename parameters" (memoize dot-exists))
 
 (defn- dorothy-edge [from-state trans]
   (let [label (str  " " (:evt trans)
@@ -376,13 +377,15 @@
 			     (format "<TABLE BORDER=\"0\"><TR><TD TITLE=\"priority = %d\">%s</TD></TR>" idx (:evt trans) )
 			     (when (:action trans)
 			       (format "<TR><TD>(%s)</TD></TR>" (:action trans)))
+			     (when (:emit trans)
+			       (format "<TR><TD>(%s) -&gt;</TD></TR>" (:emit trans)))
 			     "</TABLE>"))
 	  (format-trans [trans idx]
 			[(:from-state trans) (:to-state trans) {:label (transition-label trans idx)} ])]
     (map format-trans (:transitions state) (range (count (:transitions state))))))
 
-(defn- show-dorothy-fsm
-  "Show a simple graphviz fsm where events are show on the arcs and not ordered"
+(defn- dorothy-fsm-dot
+  "Create the graphviz dot outptu for an fsm"
   [fsm]
   (let [start-state (keyword (gensym "start-state"))
 	state-map (->> fsm meta ::states)]
@@ -392,85 +395,33 @@
 	  (map #(vector (:state %) {:label (:name %)}) state-map)
 	  [[start-state (-> state-map first :state)]]
 	  (mapcat transitions-for-state state-map)))
-	d/dot
-	d/show!)))
+	d/dot)))
 
-  ;; imple using records
-(defn- record-state-label [state]
-  (let [transitions (:transitions state)]
-    (str/join "|"
-	      (conj 	       
-	       (map #(format "<%d> %s" %2 (str/replace (:evt %1) #"([\{\|\}<>])" "\\\\$1"))
-		     transitions (range (count transitions)))
-	       (str "<state> "(:name state) )))))
-
-(defn- record-transitions-for-state [state]
-  (letfn [(format-trans [trans idx]
-			[(keyword (str (name (:from-state trans)) ":" idx)) (:to-state trans)])]
-    (map format-trans (:transitions state) (range (count (:transitions state))))))
-  
-
-(defn- show-record-dorothy-fsm
-  "Show a detailed graphviz fsm where events are shown in a table"
-  [fsm]
-  (let [start-state (keyword (gensym "start-state"))
-	state-map (->> fsm meta ::states)]
-    (-> (d/digraph
-	 (concat
-	  [{:rankdir "LR"}]
-	  [[start-state {:label "start" :style :filled :color :black :shape "point" :width 0.2 :height 0.2}]]
-	  (map #(vector (:state %) {:label (record-state-label %) :shape "record"}) state-map)
-	  [[start-state (-> state-map first :state)]]
-	  (mapcat record-transitions-for-state state-map)))
-	d/dot
-	d/show!)))
-
-
-(defn- html-state-label [state]
-  (let [transitions (:transitions state)]
-    (str "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">"
-	 "<TR><TD>" (:name state) "</TD></TR>"
-	 (str/join 
-	  (map #(format "<TR><TD PORT=\"%d\">%s</TD></TR>" %2 (str/replace (:evt %1) #"([\{\|\}<>])" "\\\\$1"))
-	       transitions (range (count transitions))))
-	  "</TABLE>" )))
-
-(defn- html-transitions-for-state [state]
-  (letfn [(format-trans [trans idx]
-			[(keyword (str (name (:from-state trans)) ":" idx)) (:to-state trans) {:label (:evt trans)}])]
-    (map format-trans (:transitions state) (range (count (:transitions state))))))
-  
-
-(defn- show-html-dorothy-fsm
-  "Show a detailed graphviz fsm where events are shown in a table"
-  [fsm]
-  (let [start-state (keyword (gensym "start-state"))
-	state-map (->> fsm meta ::states)]
-    (-> (d/digraph
-	 (concat
-	  [(d/node-attrs {:shape :plaintext})]
-	  [[start-state {:label "start" :style :filled :color :black :shape "point" :width 0.2 :height 0.2}]]
-	  (map #(vector (:state %) {:label (html-state-label %) :shape "plaintext"}) state-map)
-	  [[start-state (-> state-map first :state)]]
-	  (mapcat html-transitions-for-state state-map)))
-	d/dot
-	(#(do
-	    (println %)
-	    (d/show! %)))
-	)))
 
 (defmethod show-fsm true 
   [fsm]
-  (show-dorothy-fsm fsm))
+  (d/show! (dorothy-fsm-dot fsm)))
 
-(defn- show-vijual-fsm [fsm]
+(defmethod save-fsm-image true 
+  [fsm filename]
+  (d/save! (dorothy-fsm-dot fsm) filename))
+
+
+(defn- fsm-to-vijual [fsm]
+  (mapcat #(map (fn [trans] (vector (:from-state %) (:to-state trans))) (:transitions %))
+	  (-> fsm meta ::states)))
+
+(defmethod show-fsm false
+  [fsm]
   (vijual/draw-directed-graph
-   (mapcat #(map (fn [trans] (vector (:from-state %) (:to-state trans))) (:transitions %))
-	   (-> fsm meta ::states))))
+   (fsm-to-vijual fsm)))
 
-(defmethod show-fsm false  [fsm]
-  (show-vijual-fsm fsm))
 
+(defmethod save-fsm-image false
+  [fsm filename]
+  (vijual/save-image
+   (vijual/draw-directed-graph-image (fsm-to-vijual fsm))
+   filename))
   
 
 (comment

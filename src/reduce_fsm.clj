@@ -1,11 +1,12 @@
 (ns reduce-fsm
   "Generate and display functional finate state machines"
-  (:use [clojure pprint]
+  (:use [clojure pprint ]
 	[clojure.core.match
-	 [core :only [match match-1]]
+	 [core :only [match match-1]]	 
 	 regex])
   (:require [vijual :only [draw-directed-graph]]
 	    [dorothy [core :as d]]
+	    [clojure [string :as str]]
 	    )
   )
 
@@ -13,17 +14,30 @@
 ;; fsm-filter - stateful filters for use with filter/remove
 
 
+(defn- report-compile-error [& args]
+  (let [msg (apply format args)]
+    (println (str "error: " msg))
+    (throw (Exception. (str "FSM compilation exception: " msg)))))
+
+
+(defn- sanity-check-fsm [state-maps]
+  (let [state-names (set (map :from-state state-maps))
+	transitions (mapcat (fn [s] (map #(vector (:from-state s) (:to-state %)) (:transitions s))) state-maps)]
+    
+    (doseq [[from-state to-state] transitions]
+      (when-not (state-names to-state)	
+	(report-compile-error "The state %s was referenced in a transition from %s but does not exist" to-state from-state)))))
+
 (defn- create-transition
   "create a single transition make with default params if none specified.
   the expected input is like: [[#\".*event c\"] [{:emit emit-event :action inc-matches}? :waiting-for-a\"]]"
   [[from to]]
   (let [has-params? (map? (first to))
-	{:keys [action emit]} (if has-params? (first to) {})
+	params (if has-params? (first to) {})
 	to-state (if has-params? (second to) (first to))]
-    {:evt (last from)
-     :action action
-     :emit emit
-     :to-state to-state}))
+    (assoc params 
+      :evt (last from)
+      :to-state to-state)))
 
 (defn- create-state-map
   "Create an entry for a single '[:state evt1 -> :state1 :evt2 -> :state2 ...]"
@@ -63,19 +77,6 @@
    (keyword? state) state
    :else (keyword state)))
 
-(defn- report-compile-error [& args]
-  (let [msg (apply format args)]
-    (println (str "error: " msg))
-    (throw (Exception. (str "FSM compilation exception: " msg)))))
-
-(defn- sanity-check-fsm [state-maps]
-  (let [state-names (set (map :from-state state-maps))
-	transitions (mapcat (fn [s] (map #(vector (:from-state s) (:to-state %)) (:transitions s))) state-maps)]
-    
-    (doseq [[from-state to-state] transitions]
-      (when-not (state-names to-state)	
-	(report-compile-error "The state %s was referenced in a transition from %s but does not exist" to-state from-state)))))
-
 
 (defn- expand-evt-dispatch [state-fn-map from-state evt acc r evt-map]
   (let [target-state-fn (state-fn-map (:to-state evt-map))
@@ -94,7 +95,7 @@
 (defn- expand-dispatch [dispatch-type evt acc]
   (case dispatch-type
 	:event-only [`match-1 evt]
-	:event-and-acc   [`match [evt acc]]
+	:event-and-acc   [`match [acc evt]]
 	(throw (RuntimeException. "unknown fsm dispatch type, expected one of [:match-1 :match]"))))
   
 (defn- state-fn-impl [dispatch-type state-fn-map state]
@@ -112,12 +113,30 @@
 	~acc))))
   
 
-(defn- state-for-meta [state]
-  (assoc state
-    :transitions (vec (map #(zipmap (keys %) (map str (vals %))) (:transitions state)))))
+ (defn- transitions-metadata [state]
+   (let [from-state (keyword (:from-state state))]    
+     (map (fn [t]
+ 	   (let [trans (dissoc t :from-state :to-state)] ;; convert all non-state params into strings
+ 	     (assoc (zipmap (keys trans) (map (fn [x] `'~x) (vals trans)))
+ 	       :from-state from-state
+ 	       :to-state (keyword (:to-state t)))))
+	  (:transitions state))))
 
-(defn- fsm-metadata [state-maps] 
-  {::states (vec (map state-for-meta state-maps))
+(defn- state-metadata [state]	 
+  {:state  (keyword (:from-state state))
+   :name (if (fn-sym? (:from-state state))
+		  (str "(" (:from-state state) ")")
+		  (str (:from-state state)))
+   :params (:state-params state)
+   :transitions  (vec (transitions-metadata state))
+   })
+
+
+
+
+(defn- fsm-metadata [fsm-type state-maps]
+  {::fsm-type fsm-type
+   ::states (vec (map state-metadata state-maps))
    })
   
 (defmacro fsm [states & fsm-opts]
@@ -132,7 +151,7 @@
 	  (letfn [~@(map #(state-fn-impl dispatch state-fn-map %) state-maps)]
 	    (trampoline ~(first state-fn-names) acc# events#)
 	    )))
-       ~(fsm-metadata state-maps)
+       ~(fsm-metadata :fsm state-maps)
        )))
 
 (defmacro defsm [fsm-name states & opts]
@@ -199,7 +218,7 @@
 		  (let [[pass# next-state#] (@curr-state# evt#)]
 		    (reset! curr-state# next-state#)
 		    pass#)))))
-	 ~(fsm-metadata state-maps)))))
+	 ~(fsm-metadata :fsm-filter state-maps)))))
           
 (defmacro defsm-filter [name states & fsm-opts]
   `(def ~name (fsm-filter states ~@fsm-opts)))
@@ -323,7 +342,7 @@
 	   ([acc# events#]
 	      (when (seq events#)
 		(fsm-seq-impl (~(first state-fn-names) acc# events#)))))
-	 ~(fsm-metadata state-maps)))))
+	 ~(fsm-metadata :fsm-seq state-maps)))))
 
 (defmacro defsm-seq [name states & fsm-opts]
   `(def ~name (fsm-seq states ~@fsm-opts)))
@@ -351,13 +370,94 @@
     (vector from-state (:to-state trans) {:label label} )
     ))
 
-(defn- show-dorothy-fsm [fsm]
-  (-> (d/digraph
-       (mapcat #(map (partial dorothy-edge (:from-state %)) (:transitions %))
-	       (-> fsm meta ::states)))
-      d/dot
-      d/show!)  
-  )
+(defn- transitions-for-state [state]
+  (letfn [(transition-label [trans idx]
+			    (str
+			     (format "<TABLE BORDER=\"0\"><TR><TD TITLE=\"priority = %d\">%s</TD></TR>" idx (:evt trans) )
+			     (when (:action trans)
+			       (format "<TR><TD>(%s)</TD></TR>" (:action trans)))
+			     "</TABLE>"))
+	  (format-trans [trans idx]
+			[(:from-state trans) (:to-state trans) {:label (transition-label trans idx)} ])]
+    (map format-trans (:transitions state) (range (count (:transitions state))))))
+
+(defn- show-dorothy-fsm
+  "Show a simple graphviz fsm where events are show on the arcs and not ordered"
+  [fsm]
+  (let [start-state (keyword (gensym "start-state"))
+	state-map (->> fsm meta ::states)]
+    (-> (d/digraph
+	 (concat
+	  [[start-state {:label "start" :style :filled :color :black :shape "point" :width 0.2 :height 0.2}]]
+	  (map #(vector (:state %) {:label (:name %)}) state-map)
+	  [[start-state (-> state-map first :state)]]
+	  (mapcat transitions-for-state state-map)))
+	d/dot
+	d/show!)))
+
+  ;; imple using records
+(defn- record-state-label [state]
+  (let [transitions (:transitions state)]
+    (str/join "|"
+	      (conj 	       
+	       (map #(format "<%d> %s" %2 (str/replace (:evt %1) #"([\{\|\}<>])" "\\\\$1"))
+		     transitions (range (count transitions)))
+	       (str "<state> "(:name state) )))))
+
+(defn- record-transitions-for-state [state]
+  (letfn [(format-trans [trans idx]
+			[(keyword (str (name (:from-state trans)) ":" idx)) (:to-state trans)])]
+    (map format-trans (:transitions state) (range (count (:transitions state))))))
+  
+
+(defn- show-record-dorothy-fsm
+  "Show a detailed graphviz fsm where events are shown in a table"
+  [fsm]
+  (let [start-state (keyword (gensym "start-state"))
+	state-map (->> fsm meta ::states)]
+    (-> (d/digraph
+	 (concat
+	  [{:rankdir "LR"}]
+	  [[start-state {:label "start" :style :filled :color :black :shape "point" :width 0.2 :height 0.2}]]
+	  (map #(vector (:state %) {:label (record-state-label %) :shape "record"}) state-map)
+	  [[start-state (-> state-map first :state)]]
+	  (mapcat record-transitions-for-state state-map)))
+	d/dot
+	d/show!)))
+
+
+(defn- html-state-label [state]
+  (let [transitions (:transitions state)]
+    (str "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">"
+	 "<TR><TD>" (:name state) "</TD></TR>"
+	 (str/join 
+	  (map #(format "<TR><TD PORT=\"%d\">%s</TD></TR>" %2 (str/replace (:evt %1) #"([\{\|\}<>])" "\\\\$1"))
+	       transitions (range (count transitions))))
+	  "</TABLE>" )))
+
+(defn- html-transitions-for-state [state]
+  (letfn [(format-trans [trans idx]
+			[(keyword (str (name (:from-state trans)) ":" idx)) (:to-state trans) {:label (:evt trans)}])]
+    (map format-trans (:transitions state) (range (count (:transitions state))))))
+  
+
+(defn- show-html-dorothy-fsm
+  "Show a detailed graphviz fsm where events are shown in a table"
+  [fsm]
+  (let [start-state (keyword (gensym "start-state"))
+	state-map (->> fsm meta ::states)]
+    (-> (d/digraph
+	 (concat
+	  [(d/node-attrs {:shape :plaintext})]
+	  [[start-state {:label "start" :style :filled :color :black :shape "point" :width 0.2 :height 0.2}]]
+	  (map #(vector (:state %) {:label (html-state-label %) :shape "plaintext"}) state-map)
+	  [[start-state (-> state-map first :state)]]
+	  (mapcat html-transitions-for-state state-map)))
+	d/dot
+	(#(do
+	    (println %)
+	    (d/show! %)))
+	)))
 
 (defmethod show-fsm true 
   [fsm]

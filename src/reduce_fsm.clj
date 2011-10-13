@@ -89,8 +89,8 @@
 	~(if (fn-sym? (:to-state evt-map))      ;; if the target state is a function we need to check for early conditional termination
 	   `(if (~(:to-state evt-map) ~new-acc) ;; truthy return from a state function causes the fsm to exit
 	      ~new-acc
-	      (~target-state-fn ~new-acc ~r))
-	   `(~target-state-fn ~new-acc ~r)))])) ;; normal (keyword) states 
+	      (~target-state-fn ~new-acc (rest ~r)))
+	   `(~target-state-fn ~new-acc (rest ~r))))])) ;; normal (keyword) states 
 
 (defn- expand-dispatch [dispatch-type evt acc]
   (case dispatch-type
@@ -100,15 +100,15 @@
   
 (defn- state-fn-impl [dispatch-type state-fn-map state]
   (let [this-state-fn  (state-fn-map (:from-state state))
-	rst (gensym "rst")
+	events (gensym "events")
 	acc (gensym "acc")
 	evt (gensym "evt")]
     `(~this-state-fn
-      [~acc [~evt & ~rst]]
-      (if ~evt
+      [~acc ~events]
+      (if-let [~evt (first ~events)] 
 	#(~@(expand-dispatch dispatch-type evt acc)
-		~@(mapcat (partial expand-evt-dispatch state-fn-map (:from-state state)  evt acc rst) (:transitions state))
-		:else (~this-state-fn ~acc ~rst)
+		~@(mapcat (partial expand-evt-dispatch state-fn-map (:from-state state)  evt acc events) (:transitions state))
+		:else (~this-state-fn ~acc (rest ~events))
 		)
 	~acc))))
   
@@ -197,7 +197,7 @@
       [~acc]
       (fn [~evt]
 	(~@(expand-dispatch dispatch-type evt acc)
-	 ~@(mapcat (partial expand-filter-evt-dispatch state-fn-map state-params (:from-state state) evt acc) (:transitions state)) ;; todo - modify this for filter fn
+	 ~@(mapcat (partial expand-filter-evt-dispatch state-fn-map state-params (:from-state state) evt acc) (:transitions state)) 
 	 :else [~(get (:state-params state) :pass true) (~this-state-fn ~acc)]
 	))
 	)))
@@ -279,7 +279,7 @@
 					   :else [::no-event (state-waiting-for-c acc (rest events))])
 				   nil))]
       (when (seq events)
-	(fsm-seq-impl (state-waiting-for-a acc events)))))  
+	(fsm-seq-impl* (state-waiting-for-a acc events)))))  
   )
 
 
@@ -292,11 +292,11 @@
 	  (recur (next-step)))
 	[emitted nil]))))
 
-(defn- fsm-seq-impl [f]
+(defn fsm-seq-impl* [f]
   (let [[emitted next-step] (next-emitted f)]
     (lazy-seq
      (if next-step
-       (cons emitted (fsm-seq-impl next-step))
+       (cons emitted (fsm-seq-impl* next-step))
        (when (not= ::no-event emitted)
 	 (cons emitted nil))))))
 
@@ -341,7 +341,7 @@
 	   ([events#] (fsm-seq-fn# nil events#))
 	   ([acc# events#]
 	      (when (seq events#)
-		(fsm-seq-impl (~(first state-fn-names) acc# events#)))))
+		(fsm-seq-impl* (~(first state-fn-names) acc# events#)))))
 	 ~(fsm-metadata :fsm-seq state-maps)))))
 
 (defmacro defsm-seq [name states & fsm-opts]
@@ -398,9 +398,13 @@
 	d/dot)))
 
 
+(defn- show-dorothy-fsm [fsm]
+  (d/show! (dorothy-fsm-dot fsm)))
+
 (defmethod show-fsm true 
   [fsm]
-  (d/show! (dorothy-fsm-dot fsm)))
+  (show-dorothy-fsm fsm))
+  
 
 (defmethod save-fsm-image true 
   [fsm filename]

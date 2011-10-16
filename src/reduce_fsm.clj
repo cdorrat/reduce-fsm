@@ -335,35 +335,37 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 	))
 	)))
 
-(comment
-  (pprint 
-   (macroexpand-1 '(fsm-filter [[:initial {:pass true}
-				3 -> :suppressing]
-			       [:suppressing {:pass false}
-				6 -> :initial]])))
-  
-  ;; sample fsm-filter
-  (deffsm-filter f [[:initial {:pass true}
-		     3 -> :suppressing]
-		    [:suppressing {:pass false}
-		     6 -> :initial]])
-
-  (= [1 2 6 1 2] (filter (f) [1 2 3 4 5 1 2 6 1 2]))
-
-  ;; sample macro expansion
-(def sample-filter 
-     (letfn [(state-initial [acc]
-			    #(match-1 %
-				      3  [false (state-suppressing acc)] ;; acc could be modified by an action here
-				      :else [true (state-initial acc)]))
-	     (state-suppressing [acc]
-				#(match-1 %
-					  6  [true (state-initial acc)]
-					  :else [false (state-suppressing acc)]))]
-       state-initial))
-  )
-
+;;===================================================================================================
+;; We want to turn the following filter definition:
+;; (fsm-filter [[:initial 
+;; 	      3 -> :suppressing]
+;; 	     [:suppressing {:pass false}
+;; 	      6 -> :initial]])
+;;
+;; into this implementation:
+;;
+;; (letfn [(state-initial [acc]
+;; 	 (fn [evt]
+;; 	   (match-1 evt
+;; 		    3 [false (state-suppressing acc)]
+;; 		    :else [true (state-initial acc)])))
+;; 	(state-suppressing [acc]
+;; 	 (fn  [evt]
+;; 	   (match-1 evt
+;; 		    6 [nil (state-initial acc)]
+;; 		    :else  [false (state-suppressing acc)])))]
+;;   (fn filter-builder
+;;    ([] (filter-builder nil))
+;;    ([acc]
+;;     (let [curr-state (atom (state-initial acc))]
+;;      (fn [evt]
+;;       (let [[pass next-state] (@curr-state evt)]
+;;        (reset! curr-state next-state)
+;;        pass))))))
+;; 
 (defmacro fsm-filter [states & fsm-opts]
+  "A great docstring here
+  (= [1 2 6 1 2] (filter (f) [1 2 3 4 5 1 2 6 1 2]))"
   (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
 	state-maps  (create-state-maps states)
 	state-fn-names (map state-fn-name (map :from-state state-maps))

@@ -240,7 +240,7 @@ This package allows you to:
 ;;        (trampoline state-waiting-for-a acc events))))
 (defmacro fsm
   "Returns an fsm function that reads a sequence of events and returns
-an accumulated value (like reduce). The returned function will the following 2 arities:
+an accumulated value (like reduce). The returned function will have the following 2 arities:
  [events]     - accepts a sequence of events
  [val events] - accepts an initial value for the accumulator and a sequence of events.
 
@@ -363,9 +363,52 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 ;;        (reset! curr-state next-state)
 ;;        pass))))))
 ;; 
-(defmacro fsm-filter [states & fsm-opts]
-  "A great docstring here
+(defmacro fsm-filter 
+"Returns a function that returns fsm filters suitable for use with clojure.core/filter and remove.
+Each state in the fsm definition has a :pass attribute that will be returned from the generated function
+when it is in that state.
+
+The returned function will have the following 2 arities:
+ []    - creates a filter with the default accumulator state (nil or the value from :default-acc)
+ [val] - accepts an initial value for the accumulator 
+
+Parmaters:
+fsm      - the fsm definition (see below for syntax)
+fsm-opts - the following options are recognised:
+  :default-acc val - sets the initial value for the acculator in the single arity version function
+  :dispatch - changes the way events are matched, the follow options are accepted:
+    - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
+    - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
+
+FSM definitions:
+filters's are defined as follows:
+ [[state {:pass true/false}?
+   event -> {:action a-fn}? target-state]
+  [target-state ...]]
+
+Where
+  state is a keyword 
+  state option (:pass) is optional, it defaults to true
+  event is any legal core.match pattern (see https://github.com/clojure/core.match)
+  action is optional but must be a function if specified and their return value
+         will be used as the new accumulated state
+
+Event functions are called with (event-fn acc event from-state to-state) where
+  acc   - is the current accumulated state
+  event - is the event that fired the transition
+  from-state - the state we're transitionin from
+  to-state   - the state we're transitioning to
+
+Example:
+  Suppress numbers after seeing a 3 until we see a 6.
+
+  (def f (fsm-filter [[:initial 
+ 	               3 -> :suppressing]
+ 	              [:suppressing {:pass false}
+ 	               6 -> :initial]]))
+
   (= [1 2 6 1 2] (filter (f) [1 2 3 4 5 1 2 6 1 2]))"
+  [states & fsm-opts]
   (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
 	state-maps  (create-state-maps states)
 	state-fn-names (map state-fn-name (map :from-state state-maps))

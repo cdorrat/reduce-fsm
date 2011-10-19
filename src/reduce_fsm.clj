@@ -321,7 +321,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 
 
 (defn- state-filter-fn-impl
-  "Expand the definition of a function to handle a single state"
+  "Expand the definition of a function to handle a single filter state"
   [dispatch-type state-fn-map state-params state]
   (let [this-state-fn  (state-fn-map (:from-state state))
 	acc (gensym "acc")
@@ -434,7 +434,9 @@ Example:
 ;;===================================================================================================
 ;; fsm-seq impl
 
-(defn- next-emitted [f]
+(defn- next-emitted
+  "Process events with the fsm-seq function f until we emit a new value for the sequence"
+  [f]
   (when f
     (loop [[emitted next-step] (f)]
       (if next-step
@@ -443,7 +445,9 @@ Example:
 	  (recur (next-step)))
 	[emitted nil]))))
 
-(defn fsm-seq-impl* [f]
+(defn fsm-seq-impl*
+  "Create a lazy sequence from a fsm-seq state function" 
+  [f]
   (let [[emitted next-step] (next-emitted f)]
     (lazy-seq
      (if next-step
@@ -452,8 +456,10 @@ Example:
 	 (cons emitted nil))))))
 
 
-
-(defn- expand-seq-evt-dispatch [state-fn-map state-params from-state evt acc evt-map]
+(defn- expand-seq-evt-dispatch
+  "Expand the dispatch line for a single fsm-seq dipatch line.
+   The return value corresponds to a single case in a match clause"
+  [state-fn-map state-params from-state evt acc evt-map]
   (let [target-state-fn (state-fn-map (:to-state evt-map))
 	target-pass-val (-> evt-map :to-state state-params :pass)
 	new-acc (gensym "new-acc")]       
@@ -467,7 +473,9 @@ Example:
 			acc)]
 	[emitted# (~target-state-fn ~new-acc (rest ~evt))])]))
 
-(defn- state-seq-fn-impl [dispatch-type state-fn-map state-params state]
+(defn- state-seq-fn-impl
+  "Expand the definition of a function to handle a single state"
+  [dispatch-type state-fn-map state-params state]
   (let [this-state-fn  (state-fn-map (:from-state state))
 	acc (gensym "acc")
 	evt (gensym "evt")] 
@@ -519,7 +527,54 @@ Example:
 ;;       (reduce-fsm/fsm-seq-impl*
 ;;        (state-waiting-for-a acc events))))))
 ;;
-(defmacro fsm-seq [states & fsm-opts]
+(defmacro fsm-seq
+"Returns an fsm function that produces lazy sequences from a finite state machine.
+ The state machines can optionally add new values to the lazy sequence on transitions
+ (with the :emit option) and may accumulate state in the same way as reduce.
+
+The returned function will have the following 2 arities:
+ [events]     - accepts a sequence of events
+ [val events] - accepts an initial value for the accumulator and a sequence of events.
+
+The generated function will produce a lazy seqnuence that ends when one of the following is true:
+ - There are no more events in the event sequence
+ - The fsm reaches a terminal state
+ - The fsm reaches a state defined by a function and it returns a truthy value
+
+Parmaters:
+ fsm      - the fsm definition (see below for syntax)
+ fsm-opts - the following options are recognised:
+  :default-acc val - sets the initial value for the acculator in the single arity version function
+  :dispatch - changes the way events are matched, the follow options are accepted:
+    - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
+    - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
+
+FSM definitions:
+ fsm's are defined as follows:
+ [[state {:is-terminal true/false}?
+   event -> {:emit emit-fn :action action-fn}? target-state
+   event2 -> ...]
+  [target-state ...]]
+
+Where
+ state  is a keyword or function
+ state options (:is-terminal) are optional
+ event  is any legal core.match pattern (see https://github.com/clojure/core.match)
+ emit   is optional but its value must be a function, the return value will be added to the lazy sequence
+ action is optional but its value must be a function if specified and their return value
+        will be used as the new accumulated state
+
+State and Event Functions:
+ State functions are called with the current accumulated statelike so (state-fn acc).
+ Emit functions are called with  (emit-fn acc event),
+ Action functions are called with (action-fn acc event from-state to-state) where
+   acc   - is the current accumulated state
+   event - is the event that fired the transition
+   from-state - the state we're transitionin from
+   to-state   - the state we're transitioning to
+
+See https://github.com/cdorrat/reduce-fsm for examples and documentation"  
+  [states & fsm-opts]
   (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
 	state-maps  (create-state-maps states)
 	state-fn-names (map state-fn-name (map :from-state state-maps))

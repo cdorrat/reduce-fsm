@@ -310,7 +310,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
    The return value corresponds to a single case in a match clause"
   [state-fn-map state-params from-state evt acc evt-map]
   (let [target-state-fn (state-fn-map (:to-state evt-map))
-	target-pass-val (-> evt-map :to-state state-params :pass)
+	target-pass-val (-> evt-map :to-state state-params (get :pass true))
 	new-acc (gensym "new-acc")]   
     
     `[~(:evt evt-map)
@@ -352,7 +352,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 ;; 	(state-suppressing [acc]
 ;; 	 (fn  [evt]
 ;; 	   (match-1 evt
-;; 		    6 [nil (state-initial acc)]
+;; 		    6 [true (state-initial acc)]
 ;; 		    :else  [false (state-suppressing acc)])))]
 ;;   (fn filter-builder
 ;;    ([] (filter-builder nil))
@@ -433,48 +433,6 @@ Example:
 
 ;;===================================================================================================
 ;; fsm-seq impl
-(comment
-  ;; create a lazy sequence of all the times we saw a followed by c without an intervening b
-  ;; terminate after 1
-  (defn emit-event [acc evt & _] evt)
-  (defn inc-matches [acc & _] (inc acc))
-
-  ;; sample usage    
-  (defsm-seq my-seq [[:waiting-for-a
-		      #".*event a" -> :seen-a]
-		     [:seen-a
-		      #".*event b" -> :waiting-for-c
-		      #".*event c" -> {:emit emit-event :action inc-matches} :waiting-for-a]
-		     [:waiting-for-c
-		      #".*event c" -> :waiting-for-a]])
-  (take 10 (my-seq (ds/read-lines "afile.txt")))
-  
-  (defn sample-seq-expansion [acc events]
-    (letfn [(emit-event [acc evt] evt)
-	    (inc-matches [acc & _] (inc acc))
-	    (state-waiting-for-a [acc events]			       
-				 (if (seq events)
-				   #(match [(first events)]
-					   [#".*event a"] [::no-event (state-seen-a acc (rest events))]
-					   :else [::no-event (state-waiting-for-a acc (rest events))])
-				   nil))
-	    (state-seen-a [acc events]
-			  (if (seq events)
-			    #(match [(first events)]
-				    [#".*event b"] [::no-event (state-waiting-for-c acc (rest events))]
-				    [#".*event c"] [(emit-event acc (first events)) (state-waiting-for-a (inc-matches acc (first events) :seen-a :waiting-for-a) (rest events))]
-				    :else [::no-event (state-seen-a acc (rest events))])
-			    nil))
-	    (state-waiting-for-c [acc events]
-				 (if (seq events)
-				   #(match [(first events)]
-					   [#".*event c"] [::no-event (state-waiting-for-a acc (rest events))]
-					   :else [::no-event (state-waiting-for-c acc (rest events))])
-				   nil))]
-      (when (seq events)
-	(fsm-seq-impl* (state-waiting-for-a acc events)))))  
-  )
-
 
 (defn- next-emitted [f]
   (when f
@@ -509,7 +467,6 @@ Example:
 			acc)]
 	[emitted# (~target-state-fn ~new-acc (rest ~evt))])]))
 
-
 (defn- state-seq-fn-impl [dispatch-type state-fn-map state-params state]
   (let [this-state-fn  (state-fn-map (:from-state state))
 	acc (gensym "acc")
@@ -522,6 +479,46 @@ Example:
 	 :else [::no-event (~this-state-fn ~acc (rest ~evt))]
 	)))))
 
+;;===================================================================================================
+;; We want to turn an fsm-seq definition looking like this:
+;;
+;;  (fsm-seq 
+;;   [[:waiting-for-a
+;;     #".*event a" -> :waiting-for-b]
+;;    [:waiting-for-b
+;;     #".*event b" -> :waiting-for-c
+;;     #".*event c" -> {:emit emit-evt} :waiting-for-a]
+;;    [:waiting-for-c
+;;     #".*event c" -> :waiting-for-a]])
+;;
+;; into this implementation:
+;;
+;;  (letfn [(state-waiting-for-a
+;; 	  [acc events]
+;; 	  (when (seq events)
+;; 	    #(match-1 (first events)
+;; 		      #".*event a"  [::no-event  (state-waiting-for-b acc (rest events))]
+;; 		      :else [::no-event (state-waiting-for-a acc (rest events))])))
+;; 	 (state-waiting-for-b
+;; 	  [acc events]
+;; 	  (when (seq events)
+;; 	    #(match-1 (first events)
+;; 		      #".*event b" [::no-event (state-waiting-for-c acc (rest events))]
+;; 		      #".*event c" [(emit-evt acc (first events)) (state-waiting-for-a acc (rest events))]
+;; 		      :else [::no-event (state-waiting-for-b acc (rest events))])))	
+;; 	 (state-waiting-for-c
+;; 	  [acc events]
+;; 	  (when (seq events)
+;; 	    #(match-1  (first events)
+;; 		       #".*event c" [::no-event (state-waiting-for-a acc (rest events))]
+;; 		       :else [::no-event (state-waiting-for-c acc (rest events))])))]
+;;   (fn fsm-seq-fn
+;;    ([events] (fsm-seq-fn nil events))
+;;    ([acc events]
+;;     (when (seq events)
+;;       (reduce-fsm/fsm-seq-impl*
+;;        (state-waiting-for-a acc events))))))
+;;
 (defmacro fsm-seq [states & fsm-opts]
   (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
 	state-maps  (create-state-maps states)

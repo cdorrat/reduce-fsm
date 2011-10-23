@@ -191,7 +191,7 @@
 
 
 (deftest doc-examples
-  ;; make sure all the examples in the documentation are correct
+  ;; make sure all the examples in the documentation actually work
   (let [inc-val (fn [val & _] (inc val))
 	count-ab (fsm [[:start
 			\a -> :found-a]
@@ -199,4 +199,28 @@
 			\a ->  :found-a
 			\b -> {:action inc-val} :start
 			_ -> :start]])]
-    (is (= [2 0 1] (map (partial count-ab 0) ["abaaabc" "aaacb" "bbbcab"])))))
+    (is (= [2 0 1] (map (partial count-ab 0) ["abaaabc" "aaacb" "bbbcab"]))))
+
+  
+  (let [emit-evt (fn [acc evt] evt)
+	log-search (fsm-seq 
+		    [[:start
+		      #".*event a" -> :found-a]
+		     [:found-a
+		      #".*event b" -> :found-b
+		      #".*event c" -> {:emit emit-evt} :start]
+		     [:found-b
+		      #".*event c" -> :start]])]
+  
+    
+    (is (= ["5 event c" "5 event c"]
+	     (take 2 (log-search (cycle ["1 event a"
+					 "2 event b"
+					 "3 event c"
+					 "another event"
+					 "4 event a"
+					 "event x"
+					 "5 event c"]))))))
+			         
+    )  
+

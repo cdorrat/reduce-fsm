@@ -9,7 +9,7 @@ reduce-fsm provides a simple way to specify clojure [finite state machines](http
 - Visualize the resulting state machines with graphviz
 
 All generated state machines are plain clojure functions and read events from clojure sequences.
-Events are dispatched with core.match and allws the use of all match features (guards, destructuring, regex matching, etc.)
+Events are dispatched with core.match and allow the use of all match features (guards, destructuring, regex matching, etc.)
 
 
 ## Usage
@@ -54,8 +54,41 @@ The following example counts the number of times "ab" occurs in a sequence.
 
 #### Generating Lazy Sequences
 
-Return a sequence of lines where the events a,c,b occurred (possibly with other lines between them).
+The fsm-seq functions return lazy sequences of values created by the emit function when a state change occurs. 
+This example looks for log lines where the sequence of events was (a,c) instead of the expected (a,b,c) and
+adds the unexpected event to the output sequence. 
 
+
+```clojure
+(defn emit-evt [val evt] evt)
+
+(defsm-seq log-search
+  [[:start
+    #".*event a" -> :found-a]
+   [:found-a
+    #".*event b" -> :found-b
+    #".*event c" -> {:emit emit-evt} :start]
+   [:found-b
+    #".*event c" -> :start]])
+
+;; The resulting function accepts a sequence of events 
+;; and returns a lazy sequence of emitted values
+(take 2 (log-search (cycle ["1 event a"
+                            "2 event b"
+                            "3 event c"
+                            "another event"
+                            "4 event a"
+                            "event x"
+                            "5 event c"])))
+
+;; returns => ("5 event c" "5 event c")
+
+(show-fsm log-search)
+;; displays the image below
+
+```
+
+![show-fsm output](https://github.com/cdorrat/reduce-fsm/raw/master/images/fsm-log-search.png)
 
 #### Stateful Filtering
 

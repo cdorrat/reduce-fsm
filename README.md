@@ -47,10 +47,8 @@ The following example counts the number of times "ab" occurs in a sequence.
 ;; displays the fsm diagram below
 
 ```
-<img src="./images/fsm-count-ab.png" alt="1-show-fsm output"/>
-![try2](./images/fsm-count-ab.png)
-![try3](images/fsm-count-ab.png)
-![try4](https://github.com/cdorrat/reduce-fsm/edit/master//images/fsm-count-ab.png)
+
+![](https://github.com/cdorrat/reduce-fsm/blob/master/images/fsm-count-ab.png)
 
 
 

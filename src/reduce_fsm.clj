@@ -417,7 +417,7 @@ Example:
 	 ~(fsm-metadata :fsm-filter state-maps)))))
           
 (defmacro defsm-filter [name states & fsm-opts]
-  `(def ~name (fsm-filter states ~@fsm-opts)))
+  `(def ~name (fsm-filter ~states ~@fsm-opts)))
   
 
 
@@ -580,7 +580,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 	 ~(fsm-metadata :fsm-seq state-maps)))))
 
 (defmacro defsm-seq [name states & fsm-opts]
-  `(def ~name (fsm-seq states ~@fsm-opts)))
+  `(def ~name (fsm-seq ~states ~@fsm-opts)))
 
 
 ;; ===================================================================================================

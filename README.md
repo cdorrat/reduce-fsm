@@ -48,7 +48,7 @@ The following example counts the number of times "ab" occurs in a sequence.
 
 ```
 
-![](https://github.com/cdorrat/reduce-fsm/blob/master/images/fsm-count-ab.png)
+![show-fsm output](https://github.com/cdorrat/reduce-fsm/raw/master/images/fsm-count-ab.png)
 
 
 

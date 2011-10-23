@@ -47,8 +47,8 @@ The following example counts the number of times "ab" occurs in a sequence.
 ;; displays the fsm diagram below
 
 ```
+<img src="./images/fsm-count-ab.png" alt="show-fsm output"/>
 
-![show-fsm output](images/fsm-count-ab.png)
 
 
 ## Documentation

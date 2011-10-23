@@ -27,6 +27,7 @@ Use via:
 
 ## Examples
 The following example counts the number of times "ab" occurs in a sequence.
+
 ```clojure
 (defn inc-val [val & _] (inc val))
 
@@ -46,6 +47,7 @@ The following example counts the number of times "ab" occurs in a sequence.
 ;; displays the fsm diagram below
 
 ```
+
 ![(show-fsm count-ab) output](images/fsm-count-ab.png)
 
 

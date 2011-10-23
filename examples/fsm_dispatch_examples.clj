@@ -1,4 +1,4 @@
-(ns fsm_dispatch_examples
+(ns fsm-dispatch-examples
   "Examples illustrating the supported event dispatch styles"
   (:require [reduce-fsm :as fsm]))
 
@@ -28,10 +28,11 @@
    [:found-s
     \p -> {:action found-lisp} :start
     \l -> :found-l
-     _ -> :start]])
+    _ -> :start]]
+  :default-acc 0)
 
 
-(find-lisp 0 "ablilispghlihilisp")
+(find-lisp "ablilispghlihilisp")
 ;; => Found lisp
 ;;    Found lisp
 ;;    2
@@ -74,10 +75,12 @@
     [(n :when count-satisfied?) \c] -> {:action matched-event} done-state
     [_ \b] -> {:action inc-b-count} :found-b
     [_ _]  -> {:action reset-b-count} :start]
-   [done-state]] :dispatch :event-and-acc)
+   [done-state]]
+  :default-acc {:matched false :repeats 0}
+  :dispatch :event-and-acc)
 
 ;; test a series of strings
-(map #(->> % (sample-regex {:matched false :repeats 0}) :matched)
+(map #(-> % sample-regex  :matched)
      ["abc" "abbbbbc" "abbbc"])
 ;;=>  (false false true)
 

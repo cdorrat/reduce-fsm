@@ -105,4 +105,4 @@
 
 ;; that's it, run (start-server 5000) from the repl
 ;; telnet to your port (5000) to test the server
-;; there's no mutable state and no global vars in the whole implementation
+;; there's no mutable state in the whole implementation

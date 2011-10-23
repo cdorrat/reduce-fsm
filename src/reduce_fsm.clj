@@ -1,9 +1,10 @@
 (ns reduce-fsm
-  "Generate and display functional finite state machines that accumumlate state inthe same was as reduce.
+  "Generate and display functional finite state machines that accumumlate state in the same way as reduce.
 This package allows you to:
- - Create basic fsm's  (see fsm)
+ - Create basic fsm's (see fsm)
  - Create lazy sequences from state machines (see fsm-seq)
- - Create stateful filter functions for use with filter/remove (see fsm-filter)"
+ - Create stateful filter functions for use with filter/remove (see fsm-filter)
+ - Visualise state machines as"
   (:use [clojure.core.match
 	 [core :only [match match-1]]	 
 	 regex])
@@ -14,16 +15,10 @@ This package allows you to:
 	    [vijual :only [draw-directed-graph]])
   )
 
-(defn fn-sym?
-  "is sym a symbol that resoves to a function in the current
-   namespace or an anonymous function definition"
+(defn- fsm-fn?
+  "return true if the symbol will be treated as a function in fsm state definitions."
   [sym]
-  (cond
-   (symbol? sym) (when-let [a-var (ns-resolve *ns* sym)]
-		   (fn? @a-var))
-   (keyword? sym) false
-   (seq sym) (#{'fn 'fn*} (first sym))
-   :else false))
+  (not (keyword? sym)))
 
 (defn- report-compile-error
   "Report fatal errors during fsm compilation"
@@ -43,28 +38,12 @@ This package allows you to:
   [state-maps]
   (let [state-names (set (map :from-state state-maps))
 	transitions (mapcat (fn [s] (map #(assoc % :from-state (:from-state s)) (:transitions s))) state-maps)]
-    ;; (mapcat (fn [s] (map #(vector (:from-state s) (:to-state %)) (:transitions s))) state-maps)]
-    
-    ;; all states must be either keywords or functions
-    (doseq [state state-names ]
-      (when (not (or (keyword? state) (fn-sym? state)))
-	(report-compile-error "The state \"%s\" must be a keyword or valid function in the current namespace" state)))
-    
+
     ;; all targets of a transition must exist
     (doseq [{:keys [from-state to-state]} transitions]
       (when-not (state-names to-state)	
 	(report-compile-error "The state %s was referenced in a transition from %s but does not exist" to-state from-state)))
     
-    ;; all actions must be functions
-    (doseq [action (remove nil? (map :action transitions))]
-      (when-not (fn-sym? action)
-	(report-compile-error "The action \"%s\" is not a function in the current namespace" action)))
-    
-    ;; all emit values must be functions
-    (doseq [action (remove nil? (map :action transitions))]
-      (when-not (fn-sym? action)
-	(report-compile-error "The emit function \"%s\" is not defined in the current namespace" action)))
-
     ;; all states except for the first should be reachable by a transition
     (let [state-has-incoming-trans (set (map :to-state transitions))]
       (doseq [state (rest (map :from-state state-maps))]
@@ -85,7 +64,7 @@ This package allows you to:
       (doseq [s state-maps]	
 	(let [xtra-keys (set/difference (-> s :state-params keys set) expected-keys)]
 	  (when-not (empty? xtra-keys)
-	    (report-compile-warning "The key(s) %s was used in the state parameters for %s, we only expected one or more of expected %s"
+	    (report-compile-warning "The key(s) %s was used in the state parameters for %s, we only expected one or more of %s"
 				    xtra-keys (:from-state s) expected-keys)))))    
     ))
 
@@ -138,8 +117,16 @@ This package allows you to:
 
 
 (defn- expand-evt-dispatch
-  "Expand the dispatch of a single event, this corresponds to a single case in the match expression"
-  [state-fn-map from-state evt acc r evt-map]
+  "Expand the dispatch of a single event, this corresponds to a single case in the match expression.
+Parameters:
+  state-fn-map - a map of state-symbol -> name of implementing function
+  state-params - maps of state-symbol -> {:param1 ..} 
+  from-state   - the state we're transitioning from
+  evt          - the name of the event parameter in the match statement
+  acc          - the name of the accumulator parameter in the match statement
+  events       - the sequence of events
+  evt-map      - the map representing this transition, eg. {:to-state x :action .... }"
+  [state-fn-map state-params from-state evt acc events evt-map]
   (let [target-state-fn (state-fn-map (:to-state evt-map))
 	new-acc (gensym "new-acc")]   
     
@@ -147,11 +134,13 @@ This package allows you to:
       (let [~new-acc ~(if (:action evt-map)
 			`(~(:action evt-map) ~acc ~evt ~(state-for-action from-state) ~(state-for-action (:to-state evt-map)))
 			acc)]
-	~(if (fn-sym? (:to-state evt-map))      ;; if the target state is a function we need to check for early conditional termination
-	   `(if (~(:to-state evt-map) ~new-acc) ;; truthy return from a state function causes the fsm to exit
-	      ~new-acc
-	      (~target-state-fn ~new-acc (rest ~r)))
-	   `(~target-state-fn ~new-acc (rest ~r))))])) ;; normal (keyword) states 
+	~(cond
+	  (-> evt-map :to-state state-params :is-terminal) `~new-acc ;; terminal states return the accumulated val
+	  (fsm-fn? (:to-state evt-map))           ;; if the target state is a function we need to check for early conditional termination
+	  `(if (~(:to-state evt-map) ~new-acc)    ;; truthy return from a state function causes the fsm to exit
+	     ~new-acc
+	     (~target-state-fn ~new-acc (rest ~events)))
+	  :else `(~target-state-fn ~new-acc (rest ~events))))])) ;; normal (keyword/non-terminal) states
 
 (defn- expand-dispatch [dispatch-type evt acc]
   (case dispatch-type
@@ -161,7 +150,7 @@ This package allows you to:
   
 (defn- state-fn-impl
   "define the function used to represent a single state internally"
-  [dispatch-type state-fn-map state]
+  [dispatch-type state-fn-map state-params state]
   (let [this-state-fn  (state-fn-map (:from-state state))
 	events (gensym "events")
 	acc (gensym "acc")
@@ -170,7 +159,7 @@ This package allows you to:
       [~acc ~events]
       (if-let [~evt (first ~events)] 
 	#(~@(expand-dispatch dispatch-type evt acc)
-		~@(mapcat (partial expand-evt-dispatch state-fn-map (:from-state state)  evt acc events) (:transitions state))
+		~@(mapcat (partial expand-evt-dispatch state-fn-map state-params (:from-state state)  evt acc events) (:transitions state))
 		:else (~this-state-fn ~acc (rest ~events))
 		)
 	~acc))))
@@ -191,7 +180,7 @@ This package allows you to:
   "create the metadata representation for a single state"
   [state]	 
   {:state  (keyword (:from-state state))
-   :name (if (fn-sym? (:from-state state))
+   :name (if (fsm-fn? (:from-state state))
 		  (str "(" (:from-state state) ")")
 		  (str (:from-state state)))
    :params (:state-params state)
@@ -284,13 +273,14 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
   [states & fsm-opts]
   (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
 	state-maps  (create-state-maps states)
+	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
 	state-fn-names (map state-fn-name (map :from-state state-maps))
 	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name    
     `(with-meta
        (fn the-fsm#
 	([events#] (the-fsm# ~default-acc events#))
 	([acc# events#]
-	  (letfn [~@(map #(state-fn-impl dispatch state-fn-map %) state-maps)]
+	  (letfn [~@(map #(state-fn-impl dispatch state-fn-map state-params %) state-maps)]
 	    (trampoline ~(first state-fn-names) acc# events#)
 	    )))
        ~(fsm-metadata :fsm state-maps)
@@ -606,17 +596,37 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 	 (= 0))
     (catch Exception e false)))
 
-(defmulti show-fsm "show the fsm using graphviz if available, vijual if it's not" (memoize dot-exists))
+(defmulti show-fsm "show the fsm using graphviz if available" (memoize dot-exists))
 (defmulti save-fsm-image "save the state transition diagram for an fsm as a png. Expects an fsm and filename parameters" (memoize dot-exists))
 
-(defn- dorothy-edge [from-state trans]
+(defn- dorothy-edge
+  "Create a single edeg (transition) in a dorothy graph"
+  [from-state trans]
   (let [label (str  " " (:evt trans)
 		    (when (:action trans)
 		      (str "\\n(" (-> trans :action meta :name str) ")") ))]
     (vector from-state (:to-state trans) {:label label} )
     ))
 
-(defn- transitions-for-state [state]
+(defn- dorothy-state
+  "Create a single dorothy state"
+  [fsm-type state]
+  (let [is-terminal? (if (= :fsm-filter fsm-type)
+		       (not (get (-> state :params) :pass true))
+		       (or (get (-> state :params) :is-terminal false)
+			   (= \( (-> state :name first))))]
+    [(:state state)
+     (if is-terminal?       
+       {:label (:name state)
+	:style "filled,setlinewidth(2)"
+	:fillcolor "grey93"
+	}
+       {:label (:name state)})
+       ]))
+
+(defn- transitions-for-state
+  "return a sequence of dortothy transitions for a single state"
+  [state]
   (letfn [(transition-label [trans idx]
 			    (str
 			     (format "<TABLE BORDER=\"0\"><TR><TD TITLE=\"priority = %d\">%s</TD></TR>" idx (:evt trans) )
@@ -630,14 +640,15 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
     (map format-trans (:transitions state) (range (count (:transitions state))))))
 
 (defn- dorothy-fsm-dot
-  "Create the graphviz dot outptu for an fsm"
+  "Create the graphviz dot output for an fsm"
   [fsm]
   (let [start-state (keyword (gensym "start-state"))
-	state-map (->> fsm meta ::states)]
+	state-map (->> fsm meta ::states)
+	fsm-type (->> fsm meta ::fsm-type)]
     (-> (d/digraph
 	 (concat
 	  [[start-state {:label "start" :style :filled :color :black :shape "point" :width 0.2 :height 0.2}]]
-	  (map #(vector (:state %) {:label (:name %)}) state-map)
+	  (map (partial dorothy-state fsm-type) state-map)
 	  [[start-state (-> state-map first :state)]]
 	  (mapcat transitions-for-state state-map)))
 	d/dot)))
@@ -653,12 +664,13 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 
 (defmethod save-fsm-image true 
   [fsm filename]
-  (d/save! (dorothy-fsm-dot fsm) filename))
+  (d/save! (dorothy-fsm-dot fsm) filename {:format :png})
+  nil)
 
 
 ;; The vijual library would have been a nice alternative to graphviz with no external dependencies
 ;; however the current clojars versions seem broken an wont draw directed graphs (even the examples in the documentation)
-;; This implementation should work if fixed
+;; This implementation should work if the library is fixed
 
 ;;(defn- fsm-to-vijual [fsm]
 ;;  (mapcat #(map (fn [trans] (vector (:from-state %) (:to-state trans))) (:transitions %))
@@ -684,6 +696,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 
 (defmethod save-fsm-image false [fsm]
   (no-grapiz-message))	   
+
 
 (comment
   (pprint

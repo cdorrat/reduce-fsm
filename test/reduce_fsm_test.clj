@@ -1,6 +1,6 @@
-(ns reduce-fsm-test
-  (:use [reduce-fsm])
-  (:use [clojure.test]))
+(ns reduce-fsm-test  
+  (:use [clojure.test])
+  (:use [reduce-fsm]))
 
 (defn- test-save-line [state evt from-state to-state]
   (conj state evt))
@@ -99,6 +99,12 @@
 			       6 -> :initial]])]
     (is (= [1 2 6 1 2] (filter (a-filter) [1 2 3 4 5 1 2 6 1 2])))))
 
+(deftest fsm-filter-with-default-pass
+  (let [a-filter (fsm-filter [[:initial
+			       3 -> :suppressing]
+			      [:suppressing {:pass false}
+			       6 -> :initial]])]
+    (is (= [1 2 6 1 2] (filter (a-filter) [1 2 3 4 5 1 2 6 1 2])))))
   
 
 (comment ;; fix this test
@@ -157,7 +163,8 @@
       [#".*event b"] -> :waiting-for-c
       [#".*event c"] -> {:emit emit-evt} :waiting-for-a]
      [:waiting-for-c
-      [#".*event c"] -> :waiting-for-a]] :dispatch :match)
+      [#".*event c"] -> :waiting-for-a]]
+    :dispatch :match)
   
   ;; same as fsm log seq but emits log lines as it finds them
   ;; :action options can still be used to update internal state
@@ -169,3 +176,27 @@
 				   6 => :waiting-for-3]])
   )
 
+(deftest using-is-terminal
+  (let [inc-val (fn [val & _] (inc val))
+	the-fsm (fsm [[:start
+		       \a -> {:action inc-val} :found-a]
+		      [:found-a
+		       \b -> {:action inc-val} :found-b
+		       \a -> {:action inc-val} :found-a
+		       _ -> {:action inc-val} :start]
+		      [:found-b {:is-terminal true}
+		       _ -> {:action inc-val} :start]]
+		     :default-acc 0)]
+    (is (= 2 (the-fsm "..ababab")))))
+
+
+(deftest doc-examples
+  ;; make sure all the examples in the documentation are correct
+  (let [inc-val (fn [val & _] (inc val))
+	count-ab (fsm [[:start
+			\a -> :found-a]
+		       [:found-a
+			\a ->  :found-a
+			\b -> {:action inc-val} :start
+			_ -> :start]])]
+    (is (= [2 0 1] (map (partial count-ab 0) ["abaaabc" "aaacb" "bbbcab"])))))

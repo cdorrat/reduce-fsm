@@ -26,7 +26,9 @@ Use via:
 ```
 
 ## Examples
-The following example counts the number of times "ab" occurs in a sequence. ![show-fsm output](https://github.com/cdorrat/reduce-fsm/raw/master/images/fsm-count-ab.png)
+
+#### Basic FSM 
+The following example counts the number of times "ab" occurs in a sequence. 
 
 ```clojure
 (defn inc-val [val & _] (inc val))
@@ -39,16 +41,25 @@ The following example counts the number of times "ab" occurs in a sequence. ![sh
     \b -> {:action inc-val} :start
     _ -> :start]])
 
-;; The following repl session demostrates using the generated fsm.
-;;
-;; => (map (partial count-ab 0) ["abaaabc" "aaacb" "bbbcab"])
-;; (2 0 1)
-;; => (show-fsm count-ab)
+;; We can use the generated fsm like any function
+(map (partial count-ab 0) ["abaaabc" "aaacb" "bbbcab"])
+;; returns => (2 0 1)
+
+(show-fsm count-ab)
 ;; displays the fsm diagram below
 
 ```
 
+![show-fsm output](https://github.com/cdorrat/reduce-fsm/raw/master/images/fsm-count-ab.png)
 
+#### Generating Lazy Sequences
+
+Return a sequence of lines where the events a,c,b occurred (possibly with other lines between them).
+
+
+#### Stateful Filtering
+
+The following example suppresses values from the time a 3 is encountered until we see a 6.
 
 
 ## Documentation

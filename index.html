@@ -1,0 +1,298 @@
+<html>
+  <head>
+    <title>reduce-fsm - reduce-fsm nil API documentation</title>
+    <link href="static/favicon.png" rel="icon" />
+    <link href="static/favicon.png" rel="shortcut icon" />
+    <link media="all" type="text/css" href="static/clojure.css" rel="stylesheet" />
+    <link media="all" type="text/css" href="static/wiki.css" rel="stylesheet" />
+    <link media="all" type="text/css" href="static/internal.css" rel="stylesheet" />
+    <style>.menuWrapper{height: 36px;}</style>
+    <!--[if lte IE 6]>
+    <link rel="stylesheet" href="http://www.wikispaces.com/_/2009051601/s/internal_ie.css" type="text/css" />
+    <![endif]-->
+  </head>
+<!--
+This document was auto-generated from the source by the clojure autodoc system.
+To report errors or ask questions about the overall documentation structure, formatting,
+etc., contact Tom Faulhaber (google mail name: tomfaulhaber).
+For errors in the documentation of a particular namespace, contact the author of that
+namespace.
+-->
+  <body>
+    <div id="AllContentContainer">
+      <div id="Header">
+	<a id="Logo" href="index.html"><img alt="Clojure" height="100" width="100" src="static/clojure-icon.gif" /></a>
+	<h1><a title="page header title" id="page-header" href="index.html">reduce-fsm</a></h1>
+      </div>
+      <div id="leftcolumn"><div style="text-align: center;"></div>
+<div class="menu">
+  <div class="WikiCustomNav WikiElement wiki">
+    <span class="toc-header"><span id="project-name">reduce-fsm</span> <span id="version"></span> API</span><br />
+    <ul>
+      <li><a class="wiki_link" href="index.html">Overview</a></li>
+      <li><a class="wiki_link" href="api-index.html">API Index</a></li>
+    </ul>
+    
+    
+    <a href="http://clojure.org" class="wiki_link">Clojure Home</a>
+  </div>
+</div>
+</div>
+      <div id="rightcolumn">
+	<div id="Content">
+	  <div class="contentBox"><div class="innerContentBox">
+              <div id="content_view" class="wiki wikiPage">
+                <div id="right-sidebar"><div id="toc">
+  <h1 class="nopad">Table of Contents</h1>
+  <div style="margin-left: 1em;" class="toc-section">
+    <a href="#toc0">Overview</a>
+    <div style="margin-left: 1em;" class="toc-entry">
+      <a href="#reduce-fsm/defsm">defsm</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#reduce-fsm/fsm">fsm</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#reduce-fsm/fsm-filter">fsm-filter</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#reduce-fsm/fsm-seq">fsm-seq</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#reduce-fsm/save-fsm-image">save-fsm-image</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#reduce-fsm/show-fsm">show-fsm</a>
+    </div>
+    <br />
+  </div>
+</div>
+</div>
+                <div id="content-tag"><h1 id="overview">API for <span id="namespace-name">reduce-fsm</span>
+  - <span id="header-project">reduce-fsm</span> <span id="header-version"></span> (<span id="header-status"></span>)
+  </h1>
+
+<br />Full namespace name: <span id="long-name">reduce-fsm</span>
+<p></p>
+<h2>Overview</h2>
+<pre id="namespace-docstr">Generate and display functional finite state machines that accumumlate state
+in the same way as reduce.
+This package allows you to:
+ - Create basic fsm's (see fsm)
+ - Create lazy sequences from state machines (see fsm-seq)
+ - Create stateful filter functions for use with filter/remove (see fsm-filter)
+ - Visualise state machines as</pre>
+
+
+<br />
+<h2>Public Variables and Functions</h2>
+<div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="reduce-fsm/defsm">defsm</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (defsm fsm-name states &amp; opts)
+</pre>
+  <pre id="var-docstr">A convenience macro to define a fsm, equivalent to (def fsm-name (fsm states opts)
+see reduce-fsm/fsm for details</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="reduce-fsm/fsm">fsm</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (fsm states &amp; fsm-opts)
+</pre>
+  <pre id="var-docstr">Returns an fsm function that reads a sequence of events and returns
+an accumulated value (like reduce). The returned function will have the following 2 arities:
+ [events]     - accepts a sequence of events
+ [val events] - accepts an initial value for the accumulator and a sequence of events.
+
+The generated function will return when one of the following is true:
+ - There are no more events in the event sequence
+ - The fsm reaches a terminal state
+ - The fsm reaches a state defined by a function and it returns a truthy value
+
+Parmaters:
+ fsm      - the fsm definition (see below for syntax)
+ fsm-opts - the following options are recognised:
+  :default-acc val - sets the initial value for the accumulator in the single arity version of the function
+  :dispatch - changes the way events are matched, the follow options are accepted:
+    - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
+    - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
+
+FSM definitions:
+ fsm's are defined as follows:
+ [[state {:is-terminal true/false}?
+   event -&gt; {:action a-fn}? target-state
+   event2 -&gt; ...]
+  [target-state ...]]
+
+Where
+ state  - is a keyword or function
+ state  - options (:is-terminal) are optional
+ event  - is any legal core.match pattern (see <a href="https://github.com/clojure/core.match">https://github.com/clojure/core.match</a>)
+ action - is optional but must be a function if specified and the return value
+          will be used as the new accumulated state.
+
+State and Event Functions:
+ State functions are called like so (state-fn acc) where acc is the current accumulated state.
+ Event functions are called with (event-fn acc event from-state to-state) where
+   acc        - is the current accumulated state
+   event      - is the event that fired the transition
+   from-state - the state we're transitionin from
+   to-state   - the state we're transitioning to
+
+See <a href="https://github.com/cdorrat/reduce-fsm">https://github.com/cdorrat/reduce-fsm</a> for examples and documentation</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="reduce-fsm/fsm-filter">fsm-filter</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (fsm-filter states &amp; fsm-opts)
+</pre>
+  <pre id="var-docstr">Returns a function that returns fsm filters suitable for use with clojure.core/filter and remove.
+Each state in the fsm definition has a :pass attribute that will be returned from the generated function
+when it is in that state.
+
+The returned function will have the following 2 arities:
+ []    - creates a filter with the default accumulator state (nil or the value from :default-acc)
+ [val] - accepts an initial value for the accumulator 
+
+Parmaters:
+fsm      - the fsm definition (see below for syntax)
+fsm-opts - the following options are recognised:
+  :default-acc val - sets the initial value for the accumulator in the single arity version function
+  :dispatch - changes the way events are matched, the follow options are accepted:
+    - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
+    - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
+
+FSM definitions:
+filters's are defined as follows:
+ [[state {:pass true/false}?
+   event -&gt; {:action a-fn}? target-state]
+  [target-state ...]]
+
+Where
+  state is a keyword 
+  state option (:pass) is optional, it defaults to true
+  event is any legal core.match pattern (see <a href="https://github.com/clojure/core.match">https://github.com/clojure/core.match</a>)
+  action is optional but must be a function if specified and their return value
+         will be used as the new accumulated state
+
+Event functions are called with (event-fn acc event from-state to-state) where
+  acc        - is the current accumulated state
+  event      - is the event that fired the transition
+  from-state - the state we're transitionin from
+  to-state   - the state we're transitioning to
+
+Example:
+  Suppress numbers after seeing a 3 until we see a 6.
+
+  (def f (fsm-filter [[:initial 
+ 	               3 -&gt; :suppressing]
+ 	              [:suppressing {:pass false}
+ 	               6 -&gt; :initial]]))
+
+  (= [1 2 6 1 2] (filter (f) [1 2 3 4 5 1 2 6 1 2]))</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="reduce-fsm/fsm-seq">fsm-seq</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (fsm-seq states &amp; fsm-opts)
+</pre>
+  <pre id="var-docstr">Returns an fsm function that produces lazy sequences from a finite state machine.
+ The state machines can optionally add new values to the lazy sequence on transitions
+ (with the :emit option) and may accumulate state in the same way as reduce.
+
+The returned function will have the following 2 arities:
+ [events]     - accepts a sequence of events
+ [val events] - accepts an initial value for the accumulator and a sequence of events.
+
+The generated function will produce a lazy seqnuence that ends when one of the following is true:
+ - There are no more events in the event sequence
+ - The fsm reaches a terminal state
+ - The fsm reaches a state defined by a function and it returns a truthy value
+
+Parmaters:
+ fsm      - the fsm definition (see below for syntax)
+ fsm-opts - the following options are recognised:
+  :default-acc val - sets the initial value for the acculator in the single arity version of the function
+  :dispatch - changes the way events are matched, the follow options are accepted:
+    - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
+    - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
+
+FSM definitions:
+ fsm's are defined as follows:
+ [[state {:is-terminal true/false}?
+   event -&gt; {:emit emit-fn :action action-fn}? target-state
+   event2 -&gt; ...]
+  [target-state ...]]
+
+Where
+ state  is a keyword or function
+ state options (:is-terminal) are optional
+ event  is any legal core.match pattern (see <a href="https://github.com/clojure/core.match">https://github.com/clojure/core.match</a>)
+ emit   is optional but its value must be a function, the return value will be added to the lazy sequence
+ action is optional but its value must be a function if specified and their return value
+        will be used as the new accumulated state
+
+State and Event Functions:
+ State functions are called with the current accumulated statelike so (state-fn acc).
+ Emit functions are called with  (emit-fn acc event),
+ Action functions are called with (action-fn acc event from-state to-state) where
+   acc        - is the current accumulated state
+   event      - is the event that fired the transition
+   from-state - the state we're transitionin from
+   to-state   - the state we're transitioning to
+
+See <a href="https://github.com/cdorrat/reduce-fsm">https://github.com/cdorrat/reduce-fsm</a> for examples and documentation</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="reduce-fsm/save-fsm-image">save-fsm-image</h2>
+  <span id="var-type">multimethod</span><br />
+  <pre id="var-usage">No usage documentation available</pre>
+  <pre id="var-docstr">Save the state transition diagram for an fsm as a png.
+Expects the following parameters:
+  - fsm      - the fsm to render
+  - filename - the output file for the png.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="reduce-fsm/show-fsm">show-fsm</h2>
+  <span id="var-type">multimethod</span><br />
+  <pre id="var-usage">No usage documentation available</pre>
+  <pre id="var-docstr">Display the fsm as a diagram using graphviz (see <a href="http://www.graphviz.org/">http://www.graphviz.org/</a>)</pre>
+  
+  
+  
+</div>
+
+
+</div>
+              </div>
+            </div>
+          </div>
+	</div>
+	<div id="foot">
+	  <div style="text-align: center;" id="copyright">No copyright info </div>
+	</div>
+      </div>
+      <div id="DesignedBy">Logo &amp; site design by <a title="Visit Tom Hickey's website." href="http://www.tomhickey.com">Tom Hickey</a>.<br />
+      Clojure auto-documentation system by Tom Faulhaber.</div>
+    </div>
+    <!-- /AllContentContainer -->
+  </body>
+
+</html>

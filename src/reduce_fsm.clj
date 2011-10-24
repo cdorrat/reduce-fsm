@@ -1,5 +1,6 @@
 (ns reduce-fsm
-  "Generate and display functional finite state machines that accumumlate state in the same way as reduce.
+  "Generate and display functional finite state machines that accumumlate state
+in the same way as reduce.
 This package allows you to:
  - Create basic fsm's (see fsm)
  - Create lazy sequences from state machines (see fsm-seq)
@@ -11,8 +12,7 @@ This package allows you to:
   (:require
    [clojure [set :as set]]
    [dorothy [core :as d]]
-	    [clojure [string :as str]]
-	    [vijual :only [draw-directed-graph]])
+	    [clojure [string :as str]])
   )
 
 (defn- fsm-fn?
@@ -241,7 +241,7 @@ The generated function will return when one of the following is true:
 Parmaters:
  fsm      - the fsm definition (see below for syntax)
  fsm-opts - the following options are recognised:
-  :default-acc val - sets the initial value for the acculator in the single arity version function
+  :default-acc val - sets the initial value for the accumulator in the single arity version of the function
   :dispatch - changes the way events are matched, the follow options are accepted:
     - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
     - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
@@ -254,17 +254,17 @@ FSM definitions:
   [target-state ...]]
 
 Where
- state  is a keyword or function
- state  options (:is-terminal) are optional
- event  is any legal core.match pattern (see https://github.com/clojure/core.match)
- action is optional but must be a function if specified and their return value
-        will be used as the new accumulated state
+ state  - is a keyword or function
+ state  - options (:is-terminal) are optional
+ event  - is any legal core.match pattern (see https://github.com/clojure/core.match)
+ action - is optional but must be a function if specified and the return value
+          will be used as the new accumulated state.
 
 State and Event Functions:
  State functions are called like so (state-fn acc) where acc is the current accumulated state.
  Event functions are called with (event-fn acc event from-state to-state) where
-   acc   - is the current accumulated state
-   event - is the event that fired the transition
+   acc        - is the current accumulated state
+   event      - is the event that fired the transition
    from-state - the state we're transitionin from
    to-state   - the state we're transitioning to
 
@@ -365,7 +365,7 @@ The returned function will have the following 2 arities:
 Parmaters:
 fsm      - the fsm definition (see below for syntax)
 fsm-opts - the following options are recognised:
-  :default-acc val - sets the initial value for the acculator in the single arity version function
+  :default-acc val - sets the initial value for the accumulator in the single arity version function
   :dispatch - changes the way events are matched, the follow options are accepted:
     - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
     - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
@@ -384,8 +384,8 @@ Where
          will be used as the new accumulated state
 
 Event functions are called with (event-fn acc event from-state to-state) where
-  acc   - is the current accumulated state
-  event - is the event that fired the transition
+  acc        - is the current accumulated state
+  event      - is the event that fired the transition
   from-state - the state we're transitionin from
   to-state   - the state we're transitioning to
 
@@ -435,7 +435,7 @@ Example:
 	  (recur (next-step)))
 	[emitted nil]))))
 
-(defn fsm-seq-impl*
+(defn ^{:skip-wiki true} fsm-seq-impl*
   "Create a lazy sequence from a fsm-seq state function" 
   [f]
   (let [[emitted next-step] (next-emitted f)]
@@ -534,7 +534,7 @@ The generated function will produce a lazy seqnuence that ends when one of the f
 Parmaters:
  fsm      - the fsm definition (see below for syntax)
  fsm-opts - the following options are recognised:
-  :default-acc val - sets the initial value for the acculator in the single arity version function
+  :default-acc val - sets the initial value for the acculator in the single arity version of the function
   :dispatch - changes the way events are matched, the follow options are accepted:
     - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
     - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
@@ -558,8 +558,8 @@ State and Event Functions:
  State functions are called with the current accumulated statelike so (state-fn acc).
  Emit functions are called with  (emit-fn acc event),
  Action functions are called with (action-fn acc event from-state to-state) where
-   acc   - is the current accumulated state
-   event - is the event that fired the transition
+   acc        - is the current accumulated state
+   event      - is the event that fired the transition
    from-state - the state we're transitionin from
    to-state   - the state we're transitioning to
 
@@ -596,8 +596,11 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 	 (= 0))
     (catch Exception e false)))
 
-(defmulti show-fsm "show the fsm using graphviz if available" (memoize dot-exists))
-(defmulti save-fsm-image "save the state transition diagram for an fsm as a png. Expects an fsm and filename parameters" (memoize dot-exists))
+(defmulti show-fsm "Display the fsm as a diagram using graphviz (see http://www.graphviz.org/)" (memoize dot-exists))
+(defmulti save-fsm-image "Save the state transition diagram for an fsm as a png.
+Expects the following parameters:
+  - fsm      - the fsm to render
+  - filename - the output file for the png." (memoize dot-exists))
 
 (defn- dorothy-edge
   "Create a single edeg (transition) in a dorothy graph"
@@ -619,7 +622,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
      (if is-terminal?       
        {:label (:name state)
 	:style "filled,setlinewidth(2)"
-	:fillcolor "grey93"
+	:fillcolor "grey88"
 	}
        {:label (:name state)})
        ]))

@@ -121,7 +121,7 @@ in the examples and test directories  including:
 - a simple tcp server
 - matching repeating groups
 - using the :event-and-acc match syntax
-- uising guards on events
+- using guards on events
 
 
 ## Documentation

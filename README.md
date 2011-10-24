@@ -91,12 +91,43 @@ adds the unexpected event to the output sequence.
 ![show-fsm output](https://github.com/cdorrat/reduce-fsm/raw/master/images/fsm-log-search.png)
 
 #### Stateful Filtering
+States in filters are defined as passing values (default) or suppressing them {:pass false}.
+For each event the filter will return the pass value of the state it is in after processing the event (input sequence element).
 
 The following example suppresses values from the time a 3 is encountered until we see a 6.
+
+```clojure
+(defsm-filter sample-filter
+  [[:initial
+    3 -> :suppressing]
+   [:suppressing {:pass false}
+    6 -> :initial]])
+
+;; The resulting fsm is used with the clojure.core/filter and remove functions like this.
+(filter (sample-filter) [1 2 3 4 5 1 2 6 1 2])
+;; returns => (1 2 6 1 2)
+
+(show-fsm sample-filter)
+;; displays the diagram below
+```
+
+![show-fsm output](https://github.com/cdorrat/reduce-fsm/raw/master/images/fsm-sample-filter.png)
+
+#### Other examples
+
+There are additional exmaples on [github](https://github.com/cdorrat/reduce-fsm/tree/master)
+in the examples and test directories  including:
+
+- a simple tcp server
+- matching repeating groups
+- using the :event-and-acc match syntax
+- uising guards on events
 
 
 ## Documentation
 
+The API documentation is available on github at http://a-url-here
+The marginalia formatted version of the source is available at http://another-url-here.
 
 ## License
 

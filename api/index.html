@@ -49,6 +49,10 @@ namespace.
     <div style="margin-left: 1em;" class="toc-entry">
       <a href="#reduce-fsm/defsm">defsm</a>
     </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#reduce-fsm/defsm-filter">defsm-filter</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#reduce-fsm/defsm-seq">defsm-seq</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
       <a href="#reduce-fsm/fsm">fsm</a>
     </div><div style="margin-left: 1em;" class="toc-entry">
       <a href="#reduce-fsm/fsm-filter">fsm-filter</a>
@@ -92,7 +96,31 @@ This package allows you to:
 see reduce-fsm/fsm for details</pre>
   
   
+  <a href="https://github.com/cdorrat/reduce-fsm/b55ff99cb0510158e838ad9159bb25c64d5aab43/src/reduce_fsm.clj#L289" id="var-source">Source</a>
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="reduce-fsm/defsm-filter">defsm-filter</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (defsm-filter name states &amp; fsm-opts)
+</pre>
+  <pre id="var-docstr">A convenience macro to define an fsm filter, equivalent to (def fsm-name (fsm-filter states opts)
+see reduce-fsm/fsm-filter for details</pre>
   
+  
+  <a href="https://github.com/cdorrat/reduce-fsm/b55ff99cb0510158e838ad9159bb25c64d5aab43/src/reduce_fsm.clj#L419" id="var-source">Source</a>
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="reduce-fsm/defsm-seq">defsm-seq</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (defsm-seq name states &amp; fsm-opts)
+</pre>
+  <pre id="var-docstr">A convenience macro to define an fsm sequence, equivalent to (def fsm-name (fsm-seq states opts)
+see reduce-fsm/fsm-seq for details</pre>
+  
+  
+  <a href="https://github.com/cdorrat/reduce-fsm/b55ff99cb0510158e838ad9159bb25c64d5aab43/src/reduce_fsm.clj#L585" id="var-source">Source</a>
 </div><div id="var-entry">
   <br />
   <hr />
@@ -143,7 +171,7 @@ State and Event Functions:
 See <a href="https://github.com/cdorrat/reduce-fsm">https://github.com/cdorrat/reduce-fsm</a> for examples and documentation</pre>
   
   
-  
+  <a href="https://github.com/cdorrat/reduce-fsm/b55ff99cb0510158e838ad9159bb25c64d5aab43/src/reduce_fsm.clj#L230" id="var-source">Source</a>
 </div><div id="var-entry">
   <br />
   <hr />
@@ -197,7 +225,7 @@ Example:
   (= [1 2 6 1 2] (filter (f) [1 2 3 4 5 1 2 6 1 2]))</pre>
   
   
-  
+  <a href="https://github.com/cdorrat/reduce-fsm/b55ff99cb0510158e838ad9159bb25c64d5aab43/src/reduce_fsm.clj#L356" id="var-source">Source</a>
 </div><div id="var-entry">
   <br />
   <hr />
@@ -253,7 +281,7 @@ State and Event Functions:
 See <a href="https://github.com/cdorrat/reduce-fsm">https://github.com/cdorrat/reduce-fsm</a> for examples and documentation</pre>
   
   
-  
+  <a href="https://github.com/cdorrat/reduce-fsm/b55ff99cb0510158e838ad9159bb25c64d5aab43/src/reduce_fsm.clj#L523" id="var-source">Source</a>
 </div><div id="var-entry">
   <br />
   <hr />
@@ -266,7 +294,7 @@ Expects the following parameters:
   - filename - the output file for the png.</pre>
   
   
-  
+  <a href="https://github.com/cdorrat/reduce-fsm/b55ff99cb0510158e838ad9159bb25c64d5aab43/src/reduce_fsm.clj#L606" id="var-source">Source</a>
 </div><div id="var-entry">
   <br />
   <hr />
@@ -276,7 +304,7 @@ Expects the following parameters:
   <pre id="var-docstr">Display the fsm as a diagram using graphviz (see <a href="http://www.graphviz.org/">http://www.graphviz.org/</a>)</pre>
   
   
-  
+  <a href="https://github.com/cdorrat/reduce-fsm/b55ff99cb0510158e838ad9159bb25c64d5aab43/src/reduce_fsm.clj#L605" id="var-source">Source</a>
 </div>
 
 

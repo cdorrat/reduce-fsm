@@ -1,3 +1,7 @@
+---
+title: reduce-fsm overview
+---
+
 # reduce-fsm
 
 ## Features

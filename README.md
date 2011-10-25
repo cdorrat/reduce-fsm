@@ -11,6 +11,12 @@ reduce-fsm provides a simple way to specify clojure [finite state machines](http
 All generated state machines are plain clojure functions and read events from clojure sequences.
 Events are dispatched with core.match and allow the use of all match features (guards, destructuring, regex matching, etc.)
 
+## Documentation and Source
+
+- This documentations is available at http://cdorrat.github.com/reduce-fsm/
+- The API documentation is available on github at http://cdorrat.github.com/reduce-fsm/api/index.html
+- The source is available on GitHub at https://github.com/cdorrat/reduce-fsm
+
 
 ## Usage
 The fastest way to use this library is with Leiningen or Cake. Add the following to your project.clj dependencies:
@@ -50,7 +56,8 @@ The following example counts the number of times "ab" occurs in a sequence.
 
 ```
 
-![show-fsm output](https://github.com/cdorrat/reduce-fsm/raw/master/images/fsm-count-ab.png)
+![show-fsm output](http://cdorrat.github.com/reduce-fsm/images/fsm-count-ab.png)
+
 
 #### Generating Lazy Sequences
 
@@ -88,7 +95,8 @@ adds the unexpected event to the output sequence.
 
 ```
 
-![show-fsm output](https://github.com/cdorrat/reduce-fsm/raw/master/images/fsm-log-search.png)
+![show-fsm output](http://cdorrat.github.com/reduce-fsm/images/fsm-log-search.png)
+
 
 #### Stateful Filtering
 States in filters are defined as passing values (default) or suppressing them {:pass false}.
@@ -111,7 +119,8 @@ The following example suppresses values from the time a 3 is encountered until w
 ;; displays the diagram below
 ```
 
-![show-fsm output](https://github.com/cdorrat/reduce-fsm/raw/master/images/fsm-sample-filter.png)
+![show-fsm output](http://cdorrat.github.com/reduce-fsm/images/fsm-sample-filter.png)
+
 
 #### Other examples
 
@@ -123,11 +132,6 @@ in the examples and test directories  including:
 - using the :event-and-acc match syntax
 - using guards on events
 
-
-## Documentation
-
-The API documentation is available on github at http://a-url-here
-The marginalia formatted version of the source is available at http://another-url-here.
 
 ## License
 

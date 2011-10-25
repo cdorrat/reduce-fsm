@@ -416,7 +416,10 @@ Example:
 		    pass#)))))
 	 ~(fsm-metadata :fsm-filter state-maps)))))
           
-(defmacro defsm-filter [name states & fsm-opts]
+(defmacro defsm-filter
+  "A convenience macro to define an fsm filter, equivalent to (def fsm-name (fsm-filter states opts)
+   see reduce-fsm/fsm-filter for details"
+    [name states & fsm-opts]
   `(def ~name (fsm-filter ~states ~@fsm-opts)))
   
 
@@ -579,7 +582,10 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 		(fsm-seq-impl* (~(first state-fn-names) acc# events#)))))
 	 ~(fsm-metadata :fsm-seq state-maps)))))
 
-(defmacro defsm-seq [name states & fsm-opts]
+(defmacro defsm-seq
+  "A convenience macro to define an fsm sequence, equivalent to (def fsm-name (fsm-seq states opts)
+   see reduce-fsm/fsm-seq for details"  
+  [name states & fsm-opts]
   `(def ~name (fsm-seq ~states ~@fsm-opts)))
 
 

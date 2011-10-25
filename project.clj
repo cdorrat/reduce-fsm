@@ -1,3 +1,4 @@
+
 (defproject reduce-fsm "1.0.0-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.2.1"]
@@ -6,4 +7,7 @@
 		 [match "0.2.0-SNAPSHOT"]]
   :dev-dependencies [[swank-clojure "1.2.1"]
 		     [marginalia "0.7.0-SNAPSHOT"] ; anotated source
-		     [org.clojars.weavejester/autodoc "0.9.0"]])
+		     [org.clojars.weavejester/autodoc "0.9.0"]]
+  :autodoc {:web-src-dir "https://github.com/cdorrat/reduce-fsm/"
+	    :web-home "http://cdorrat.github.com/reduce-fsm/"
+	    :output-path "./autodoc/api"})

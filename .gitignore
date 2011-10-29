@@ -2,3 +2,5 @@ autodoc/**
 lib/**
 pom.xml
 .#*
+.lein-failures
+multi-lib/**

@@ -602,8 +602,8 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 	 (= 0))
     (catch Exception e false)))
 
-(defmulti show-fsm "Display the fsm as a diagram using graphviz (see http://www.graphviz.org/)" (memoize dot-exists))
-(defmulti save-fsm-image "Save the state transition diagram for an fsm as a png.
+(defmulti ^{:arglists "[fsm]" } show-fsm "Display the fsm as a diagram using graphviz (see http://www.graphviz.org/)" (memoize dot-exists))
+(defmulti ^{:arglists "[fsm filename]"} save-fsm-image "Save the state transition diagram for an fsm as a png.
 Expects the following parameters:
   - fsm      - the fsm to render
   - filename - the output file for the png." (memoize dot-exists))

@@ -1,6 +1,7 @@
 (ns reduce-fsm-test  
   (:use [clojure.test])
-  (:use [reduce-fsm]))
+  (:use [reduce-fsm])
+  (:import [java.awt.Frame]))
 
 (defn- test-save-line [state evt from-state to-state]
   (conj state evt))
@@ -49,28 +50,20 @@
 		  1 -> {:action save-to-state} :initial]
 		 [:even
 		  (n :when odd?) -> {:action save-to-state} :initial]])]
-    (is (= [:even :initial :small :initial] (an-fsm [] [2 2 4 3 1 2 2 1])))))
+    (is (= [:even :initial :small :initial] (an-fsm [] [8 2 4 3 1 2 2 1])))))
 
 
 (deftest display-dorothy-fsm-test
   (let [frame (#'reduce-fsm/show-dorothy-fsm log-search-fsm-test)]
     (is (not (nil? frame)))
     (when frame
-      (.dispose frame))
+      (.dispose ^java.awt.Frame frame))
     ))
-
-;; fails - need to investigate vijual
-;;(deftest display-vijual-fsm-test
-;;  (#'reduce-fsm/show-vijual-fsm log-search-fsm))
-
  
   
 ;;(deftest exit-with-state-fn
 ;;  (is false "write test for fsm that conditionally exits with a state fn")) 
 
-
-;;(deftest fsm-with-guards
-;;  (is false "write test for fsm that guard transitions"))
 
 (deftest simple-fsm-seq
   (let [emit-evt (fn [acc evt] evt)

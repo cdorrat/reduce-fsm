@@ -1,0 +1,724 @@
+<html>
+  <!-- The GitHub pages markdown support seesm to choke on README.md and we want the nice source formatting -->
+  <!-- this is a hack, we'll just take the rendered version from the main part of the site -->
+ <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+        <title>reduce-fsm - overview</title>
+    
+    <meta content="authenticity_token" name="csrf-param" />
+    <meta content="3eb798a8f057f5cf3a650148f212f8841c1f8d88" name="csrf-token" />
+
+    <link href="https://a248.e.akamai.net/assets.github.com/stylesheets/bundle_github.css?b4b7d3dfc591909dc4259677aecf00c2b4bdd58c" media="screen" rel="stylesheet" type="text/css" />
+    
+
+    <script src="https://a248.e.akamai.net/assets.github.com/javascripts/bundle_jquery.js?1cda878e9113acce74087d5ff1a5e1c49fb94eeb" type="text/javascript"></script>
+    <script src="https://a248.e.akamai.net/assets.github.com/javascripts/bundle_github.js?f85340baf697600405a21c9b45ac1a314f3ece97" type="text/javascript"></script>
+    <meta name="description" content="reduce-fsm - A clojure finite state machine library" />
+
+  </head>
+<body>
+<div style="display: none;" class="announce instapaper_body md" data-path="/" id="readme"><span class="name">README.md</span><div class="wikistyle">
+<h1>reduce-fsm</h1>
+
+<h2>Features</h2>
+
+<p>reduce-fsm provides a simple way to specify clojure <a href="http://en.wikipedia.org/wiki/Finite-state_machine">finite state machines</a>, it allows you to:</p>
+
+<ul>
+<li>Define define state machines that accumulate values (in the same was that reduce does)</li>
+<li>Create lazy sequences from state machines</li>
+<li>Perform stateful filtering with clojures filter/remove functions</li>
+<li>Visualize the resulting state machines with graphviz</li>
+</ul><p>All generated state machines are plain clojure functions and read events from clojure sequences.
+Events are dispatched with core.match and allow the use of all match features (guards, destructuring, regex matching, etc.)</p>
+
+<h2>Documentation and Source</h2>
+
+<ul>
+<li>This documentations is available at <a href="http://cdorrat.github.com/reduce-fsm/">http://cdorrat.github.com/reduce-fsm/</a>
+</li>
+<li>The API documentation is available on github at <a href="http://cdorrat.github.com/reduce-fsm/api/index.html">http://cdorrat.github.com/reduce-fsm/api/index.html</a>
+</li>
+<li>The source is available on GitHub at <a href="https://github.com/cdorrat/reduce-fsm">https://github.com/cdorrat/reduce-fsm</a>
+</li>
+</ul><h2>Usage</h2>
+
+<p>The fastest way to use this library is with Leiningen or Cake. Add the following to your project.clj dependencies:</p>
+
+<div class="highlight">
+<pre><span class="p">[</span><span class="nv">cdorrat/reduce-fsm</span><span class="w"> </span><span class="s">"0.1.0-SNAPSHOT"</span><span class="p">]</span><span class="w"></span>
+</pre>
+</div>
+
+
+<p>Use via:</p>
+
+<div class="highlight">
+<pre><span class="p">(</span><span class="nf">require</span><span class="w"> </span><span class="o">'</span><span class="p">[</span><span class="nv">reduce-fsm</span><span class="w"> </span><span class="no">:as</span><span class="w"> </span><span class="nv">fsm</span><span class="p">])</span><span class="w"></span>
+</pre>
+</div>
+
+
+<h2>Examples</h2>
+
+<h4>Basic FSM</h4>
+
+<p>The following example counts the number of times "ab" occurs in a sequence. </p>
+
+<div class="highlight">
+<pre><span class="p">(</span><span class="nf">defn</span><span class="w"> </span><span class="nv">inc-val</span><span class="w"> </span><span class="p">[</span><span class="nv">val</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="nv">_</span><span class="p">]</span><span class="w"> </span><span class="p">(</span><span class="nf">inc</span><span class="w"> </span><span class="nv">val</span><span class="p">))</span><span class="w"></span>
+
+<span class="p">(</span><span class="nf">fsm/defsm</span><span class="w"> </span><span class="nv">count-ab</span><span class="w"></span>
+<span class="w">  </span><span class="p">[[</span><span class="no">:start</span><span class="w"></span>
+<span class="w">    </span><span class="sc">\a</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:found-a</span><span class="p">]</span><span class="w"></span>
+<span class="w">   </span><span class="p">[</span><span class="no">:found-a</span><span class="w"></span>
+<span class="w">    </span><span class="sc">\a</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w">  </span><span class="no">:found-a</span><span class="w"></span>
+<span class="w">    </span><span class="sc">\b</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="no">:action</span><span class="w"> </span><span class="nv">inc-val</span><span class="p">}</span><span class="w"> </span><span class="no">:start</span><span class="w"></span>
+<span class="w">    </span><span class="nv">_</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:start</span><span class="p">]])</span><span class="w"></span>
+
+<span class="c1">;; We can use the generated fsm like any function</span><span class="w"></span>
+<span class="p">(</span><span class="nf">map</span><span class="w"> </span><span class="p">(</span><span class="nf">partial</span><span class="w"> </span><span class="nv">count-ab</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">[</span><span class="s">"abaaabc"</span><span class="w"> </span><span class="s">"aaacb"</span><span class="w"> </span><span class="s">"bbbcab"</span><span class="p">])</span><span class="w"></span>
+<span class="c1">;; returns =&gt; (2 0 1)</span><span class="w"></span>
+
+<span class="p">(</span><span class="nf">show-fsm</span><span class="w"> </span><span class="nv">count-ab</span><span class="p">)</span><span class="w"></span>
+<span class="c1">;; displays the fsm diagram below</span><span class="w"></span>
+
+</pre>
+</div>
+
+
+<p><img src="https://a248.e.akamai.net/assets.github.com/img/ea8e1e379a1b4864ecf348857d01d6c6bd1846b3/687474703a2f2f63646f727261742e6769746875622e636f6d2f7265647563652d66736d2f696d616765732f66736d2d636f756e742d61622e706e67" alt="show-fsm output"></p>
+
+<h4>Generating Lazy Sequences</h4>
+
+<p>The fsm-seq functions return lazy sequences of values created by the emit function when a state change occurs. 
+This example looks for log lines where the sequence of events was (a,c) instead of the expected (a,b,c) and
+adds the unexpected event to the output sequence. </p>
+
+<div class="highlight">
+<pre><span class="p">(</span><span class="nf">defn</span><span class="w"> </span><span class="nv">emit-evt</span><span class="w"> </span><span class="p">[</span><span class="nv">val</span><span class="w"> </span><span class="nv">evt</span><span class="p">]</span><span class="w"> </span><span class="nv">evt</span><span class="p">)</span><span class="w"></span>
+
+<span class="p">(</span><span class="nf">defsm-seq</span><span class="w"> </span><span class="nv">log-search</span><span class="w"></span>
+<span class="w">  </span><span class="p">[[</span><span class="no">:start</span><span class="w"></span>
+<span class="w">    </span><span class="o">#</span><span class="s">".*event a"</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:found-a</span><span class="p">]</span><span class="w"></span>
+<span class="w">   </span><span class="p">[</span><span class="no">:found-a</span><span class="w"></span>
+<span class="w">    </span><span class="o">#</span><span class="s">".*event b"</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:found-b</span><span class="w"></span>
+<span class="w">    </span><span class="o">#</span><span class="s">".*event c"</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="no">:emit</span><span class="w"> </span><span class="nv">emit-evt</span><span class="p">}</span><span class="w"> </span><span class="no">:start</span><span class="p">]</span><span class="w"></span>
+<span class="w">   </span><span class="p">[</span><span class="no">:found-b</span><span class="w"></span>
+<span class="w">    </span><span class="o">#</span><span class="s">".*event c"</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:start</span><span class="p">]])</span><span class="w"></span>
+
+<span class="c1">;; The resulting function accepts a sequence of events </span><span class="w"></span>
+<span class="c1">;; and returns a lazy sequence of emitted values</span><span class="w"></span>
+<span class="p">(</span><span class="nf">take</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">(</span><span class="nf">log-search</span><span class="w"> </span><span class="p">(</span><span class="nf">cycle</span><span class="w"> </span><span class="p">[</span><span class="s">"1 event a"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"2 event b"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"3 event c"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"another event"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"4 event a"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"event x"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"5 event c"</span><span class="p">])))</span><span class="w"></span>
+
+<span class="c1">;; returns =&gt; ("5 event c" "5 event c")</span><span class="w"></span>
+
+<span class="p">(</span><span class="nf">show-fsm</span><span class="w"> </span><span class="nv">log-search</span><span class="p">)</span><span class="w"></span>
+<span class="c1">;; displays the image below</span><span class="w"></span>
+
+</pre>
+</div>
+
+
+<p><img src="https://a248.e.akamai.net/assets.github.com/img/befbe93d06b0067b6fceee9152359013318b2267/687474703a2f2f63646f727261742e6769746875622e636f6d2f7265647563652d66736d2f696d616765732f66736d2d6c6f672d7365617263682e706e67" alt="show-fsm output"></p>
+
+<h4>Stateful Filtering</h4>
+
+<p>States in filters are defined as passing values (default) or suppressing them {:pass false}.
+For each event the filter will return the pass value of the state it is in after processing the event (input sequence element).</p>
+
+<p>The following example suppresses values from the time a 3 is encountered until we see a 6.</p>
+
+<div class="highlight">
+<pre><span class="p">(</span><span class="nf">defsm-filter</span><span class="w"> </span><span class="nv">sample-filter</span><span class="w"></span>
+<span class="w">  </span><span class="p">[[</span><span class="no">:initial</span><span class="w"></span>
+<span class="w">    </span><span class="mi">3</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:suppressing</span><span class="p">]</span><span class="w"></span>
+<span class="w">   </span><span class="p">[</span><span class="no">:suppressing</span><span class="w"> </span><span class="p">{</span><span class="no">:pass</span><span class="w"> </span><span class="nv">false</span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="mi">6</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:initial</span><span class="p">]])</span><span class="w"></span>
+
+<span class="c1">;; The resulting fsm is used with the clojure.core/filter and remove functions like this.</span><span class="w"></span>
+<span class="p">(</span><span class="nf">filter</span><span class="w"> </span><span class="p">(</span><span class="nf">sample-filter</span><span class="p">)</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="mi">6</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="mi">2</span><span class="p">])</span><span class="w"></span>
+<span class="c1">;; returns =&gt; (1 2 6 1 2)</span><span class="w"></span>
+
+<span class="p">(</span><span class="nf">show-fsm</span><span class="w"> </span><span class="nv">sample-filter</span><span class="p">)</span><span class="w"></span>
+<span class="c1">;; displays the diagram below</span><span class="w"></span>
+</pre>
+</div>
+
+
+<p><img src="https://a248.e.akamai.net/assets.github.com/img/362aa7cdfeebd21acfec45ef822fd9c8aa1f1a08/687474703a2f2f63646f727261742e6769746875622e636f6d2f7265647563652d66736d2f696d616765732f66736d2d73616d706c652d66696c7465722e706e67" alt="show-fsm output"></p>
+
+<h4>Other examples</h4>
+
+<p>There are additional exmaples on <a href="https://github.com/cdorrat/reduce-fsm/tree/master">github</a>
+in the examples and test directories  including:</p>
+
+<ul>
+<li>a simple tcp server</li>
+<li>matching repeating groups</li>
+<li>using the :event-and-acc match syntax</li>
+<li>using guards on events</li>
+</ul><h2>License</h2>
+
+<p>Copyright (C) 2011 Cameron Dorrat</p>
+
+<p>Distributed under the Eclipse Public License, the same as Clojure.</p></div></div>
+    </div>
+<div class="frame frame-center" data-path="README.md/" data-permalink-url="/cdorrat/reduce-fsm/blob/0be34b03f724d73909ab4d629bfc826a5f2186f8/README.md" data-title="README.md at master from cdorrat/reduce-fsm - GitHub" data-type="blob">
+            
+  <div id="readme" class="blob instapaper_body">
+    <div class="wikistyle"><h1>reduce-fsm</h1>
+
+<h2>Features</h2>
+
+<p>reduce-fsm provides a simple way to specify clojure <a href="http://en.wikipedia.org/wiki/Finite-state_machine">finite state machines</a>, it allows you to:</p>
+
+<ul>
+<li>Define define state machines that accumulate values (in the same was that reduce does)</li>
+<li>Create lazy sequences from state machines</li>
+<li>Perform stateful filtering with clojures filter/remove functions</li>
+<li>Visualize the resulting state machines with graphviz</li>
+</ul><p>All generated state machines are plain clojure functions and read events from clojure sequences.
+Events are dispatched with core.match and allow the use of all match features (guards, destructuring, regex matching, etc.)</p>
+
+<h2>Documentation and Source</h2>
+
+<ul>
+<li>This documentation is available at <a href="http://cdorrat.github.com/reduce-fsm/">http://cdorrat.github.com/reduce-fsm/</a>
+</li>
+<li>The API documentation is available on github at <a href="http://cdorrat.github.com/reduce-fsm/api">http://cdorrat.github.com/reduce-fsm/api</a>
+</li>
+<li>The source is available on GitHub at <a href="https://github.com/cdorrat/reduce-fsm">https://github.com/cdorrat/reduce-fsm</a>
+</li>
+</ul><h2>Usage</h2>
+
+<p>The fastest way to use this library is with Leiningen or Cake. Add the following to your project.clj dependencies:</p>
+
+<div class="highlight">
+<pre><span class="p">[</span><span class="nv">reduce-fsm</span><span class="w"> </span><span class="s">"0.1.0-SNAPSHOT"</span><span class="p">]</span><span class="w"></span>
+</pre>
+</div>
+
+
+<p>Use via:</p>
+
+<div class="highlight">
+<pre><span class="p">(</span><span class="nf">require</span><span class="w"> </span><span class="o">'</span><span class="p">[</span><span class="nv">reduce-fsm</span><span class="w"> </span><span class="no">:as</span><span class="w"> </span><span class="nv">fsm</span><span class="p">])</span><span class="w"></span>
+</pre>
+</div>
+
+
+<h2>Examples</h2>
+
+<h4>Basic FSM</h4>
+
+<p>The following example counts the number of times "ab" occurs in a sequence. </p>
+
+<div class="highlight">
+<pre><span class="p">(</span><span class="nf">defn</span><span class="w"> </span><span class="nv">inc-val</span><span class="w"> </span><span class="p">[</span><span class="nv">val</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="nv">_</span><span class="p">]</span><span class="w"> </span><span class="p">(</span><span class="nf">inc</span><span class="w"> </span><span class="nv">val</span><span class="p">))</span><span class="w"></span>
+
+<span class="p">(</span><span class="nf">fsm/defsm</span><span class="w"> </span><span class="nv">count-ab</span><span class="w"></span>
+<span class="w">  </span><span class="p">[[</span><span class="no">:start</span><span class="w"></span>
+<span class="w">    </span><span class="sc">\a</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:found-a</span><span class="p">]</span><span class="w"></span>
+<span class="w">   </span><span class="p">[</span><span class="no">:found-a</span><span class="w"></span>
+<span class="w">    </span><span class="sc">\a</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w">  </span><span class="no">:found-a</span><span class="w"></span>
+<span class="w">    </span><span class="sc">\b</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="no">:action</span><span class="w"> </span><span class="nv">inc-val</span><span class="p">}</span><span class="w"> </span><span class="no">:start</span><span class="w"></span>
+<span class="w">    </span><span class="nv">_</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:start</span><span class="p">]])</span><span class="w"></span>
+
+<span class="c1">;; We can use the generated fsm like any function</span><span class="w"></span>
+<span class="p">(</span><span class="nf">map</span><span class="w"> </span><span class="p">(</span><span class="nf">partial</span><span class="w"> </span><span class="nv">count-ab</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">[</span><span class="s">"abaaabc"</span><span class="w"> </span><span class="s">"aaacb"</span><span class="w"> </span><span class="s">"bbbcab"</span><span class="p">])</span><span class="w"></span>
+<span class="c1">;; returns =&gt; (2 0 1)</span><span class="w"></span>
+
+<span class="p">(</span><span class="nf">show-fsm</span><span class="w"> </span><span class="nv">count-ab</span><span class="p">)</span><span class="w"></span>
+<span class="c1">;; displays the fsm diagram below</span><span class="w"></span>
+
+</pre>
+</div>
+
+
+<p><img src="https://a248.e.akamai.net/assets.github.com/img/ea8e1e379a1b4864ecf348857d01d6c6bd1846b3/687474703a2f2f63646f727261742e6769746875622e636f6d2f7265647563652d66736d2f696d616765732f66736d2d636f756e742d61622e706e67" alt="show-fsm output"></p>
+
+<h4>Generating Lazy Sequences</h4>
+
+<p>The fsm-seq functions return lazy sequences of values created by the emit function when a state change occurs. 
+This example looks for log lines where the sequence of events was (a,c) instead of the expected (a,b,c) and
+adds the unexpected event to the output sequence. </p>
+
+<div class="highlight">
+<pre><span class="p">(</span><span class="nf">defn</span><span class="w"> </span><span class="nv">emit-evt</span><span class="w"> </span><span class="p">[</span><span class="nv">val</span><span class="w"> </span><span class="nv">evt</span><span class="p">]</span><span class="w"> </span><span class="nv">evt</span><span class="p">)</span><span class="w"></span>
+
+<span class="p">(</span><span class="nf">defsm-seq</span><span class="w"> </span><span class="nv">log-search</span><span class="w"></span>
+<span class="w">  </span><span class="p">[[</span><span class="no">:start</span><span class="w"></span>
+<span class="w">    </span><span class="o">#</span><span class="s">".*event a"</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:found-a</span><span class="p">]</span><span class="w"></span>
+<span class="w">   </span><span class="p">[</span><span class="no">:found-a</span><span class="w"></span>
+<span class="w">    </span><span class="o">#</span><span class="s">".*event b"</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:found-b</span><span class="w"></span>
+<span class="w">    </span><span class="o">#</span><span class="s">".*event c"</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="no">:emit</span><span class="w"> </span><span class="nv">emit-evt</span><span class="p">}</span><span class="w"> </span><span class="no">:start</span><span class="p">]</span><span class="w"></span>
+<span class="w">   </span><span class="p">[</span><span class="no">:found-b</span><span class="w"></span>
+<span class="w">    </span><span class="o">#</span><span class="s">".*event c"</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:start</span><span class="p">]])</span><span class="w"></span>
+
+<span class="c1">;; The resulting function accepts a sequence of events </span><span class="w"></span>
+<span class="c1">;; and returns a lazy sequence of emitted values</span><span class="w"></span>
+<span class="p">(</span><span class="nf">take</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">(</span><span class="nf">log-search</span><span class="w"> </span><span class="p">(</span><span class="nf">cycle</span><span class="w"> </span><span class="p">[</span><span class="s">"1 event a"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"2 event b"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"3 event c"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"another event"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"4 event a"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"event x"</span><span class="w"></span>
+<span class="w">                            </span><span class="s">"5 event c"</span><span class="p">])))</span><span class="w"></span>
+
+<span class="c1">;; returns =&gt; ("5 event c" "5 event c")</span><span class="w"></span>
+
+<span class="p">(</span><span class="nf">show-fsm</span><span class="w"> </span><span class="nv">log-search</span><span class="p">)</span><span class="w"></span>
+<span class="c1">;; displays the image below</span><span class="w"></span>
+
+</pre>
+</div>
+
+
+<p><img src="https://a248.e.akamai.net/assets.github.com/img/befbe93d06b0067b6fceee9152359013318b2267/687474703a2f2f63646f727261742e6769746875622e636f6d2f7265647563652d66736d2f696d616765732f66736d2d6c6f672d7365617263682e706e67" alt="show-fsm output"></p>
+
+<h4>Stateful Filtering</h4>
+
+<p>States in filters are defined as passing values (default) or suppressing them {:pass false}.
+For each event the filter will return the pass value of the state it is in after processing the event (input sequence element).</p>
+
+<p>The following example suppresses values from the time a 3 is encountered until we see a 6.</p>
+
+<div class="highlight">
+<pre><span class="p">(</span><span class="nf">defsm-filter</span><span class="w"> </span><span class="nv">sample-filter</span><span class="w"></span>
+<span class="w">  </span><span class="p">[[</span><span class="no">:initial</span><span class="w"></span>
+<span class="w">    </span><span class="mi">3</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:suppressing</span><span class="p">]</span><span class="w"></span>
+<span class="w">   </span><span class="p">[</span><span class="no">:suppressing</span><span class="w"> </span><span class="p">{</span><span class="no">:pass</span><span class="w"> </span><span class="nv">false</span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="mi">6</span><span class="w"> </span><span class="nv">-&gt;</span><span class="w"> </span><span class="no">:initial</span><span class="p">]])</span><span class="w"></span>
+
+<span class="c1">;; The resulting fsm is used with the clojure.core/filter and remove functions like this.</span><span class="w"></span>
+<span class="p">(</span><span class="nf">filter</span><span class="w"> </span><span class="p">(</span><span class="nf">sample-filter</span><span class="p">)</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="mi">6</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="mi">2</span><span class="p">])</span><span class="w"></span>
+<span class="c1">;; returns =&gt; (1 2 6 1 2)</span><span class="w"></span>
+
+<span class="p">(</span><span class="nf">show-fsm</span><span class="w"> </span><span class="nv">sample-filter</span><span class="p">)</span><span class="w"></span>
+<span class="c1">;; displays the diagram below</span><span class="w"></span>
+</pre>
+</div>
+
+
+<p><img src="https://a248.e.akamai.net/assets.github.com/img/362aa7cdfeebd21acfec45ef822fd9c8aa1f1a08/687474703a2f2f63646f727261742e6769746875622e636f6d2f7265647563652d66736d2f696d616765732f66736d2d73616d706c652d66696c7465722e706e67" alt="show-fsm output"></p>
+
+<h4>Other examples</h4>
+
+<p>There are additional exmaples on <a href="https://github.com/cdorrat/reduce-fsm/tree/master">github</a>
+in the examples and test directories  including:</p>
+
+<ul>
+<li>a simple tcp server</li>
+<li>matching repeating groups</li>
+<li>using the :event-and-acc match syntax</li>
+<li>using guards on events</li>
+</ul><h2>License</h2>
+
+<p>Copyright (C) 2011 Cameron Dorrat</p>
+
+<p>Distributed under the Eclipse Public License, the same as Clojure.</p></div>
+  </div>
+
+          </div>
+        </div>
+      </div>
+  </div>
+  <br style="clear:both;">
+
+
+<br style="clear:both;">
+
+<div class="frame frame-loading" style="display:none;" data-tree-list-url="/cdorrat/reduce-fsm/tree-list/1e4237254a0adf408562d06ee0b148b752788a3d" data-blob-url-prefix="/cdorrat/reduce-fsm/blob/1e4237254a0adf408562d06ee0b148b752788a3d">
+  <img src="https://a248.e.akamai.net/assets.github.com/images/modules/ajax/big_spinner_336699.gif" height="32" width="32">
+</div>
+
+
+
+  </div>
+
+    </div>
+
+    </div>
+
+    <!-- footer -->
+    <div id="footer">
+      
+  <div class="upper_footer">
+     <div class="site">
+
+       <!--[if IE]><h4 id="blacktocat_ie">GitHub Links</h4><![endif]-->
+       <!--[if !IE]--><h4 id="blacktocat">GitHub Links</h4><!--[endif]-->
+
+       <ul class="footer_nav">
+         <h4>GitHub</h4>
+         <li><a href="https://github.com/about">About</a></li>
+         <li><a href="https://github.com/blog">Blog</a></li>
+         <li><a href="https://github.com/features">Features</a></li>
+         <li><a href="https://github.com/contact">Contact &amp; Support</a></li>
+         <li><a href="https://github.com/training">Training</a></li>
+         <li><a href="http://status.github.com/">Site Status</a></li>
+       </ul>
+
+       <ul class="footer_nav">
+         <h4>Tools</h4>
+         <li><a href="http://mac.github.com/">GitHub for Mac</a></li>
+         <li><a href="http://mobile.github.com/">Issues for iPhone</a></li>
+         <li><a href="https://gist.github.com">Gist: Code Snippets</a></li>
+         <li><a href="http://fi.github.com/">Enterprise Install</a></li>
+         <li><a href="http://jobs.github.com/">Job Board</a></li>
+       </ul>
+
+       <ul class="footer_nav">
+         <h4>Extras</h4>
+         <li><a href="http://shop.github.com/">GitHub Shop</a></li>
+         <li><a href="http://octodex.github.com/">The Octodex</a></li>
+       </ul>
+
+       <ul class="footer_nav">
+         <h4>Documentation</h4>
+         <li><a href="http://help.github.com/">GitHub Help</a></li>
+         <li><a href="http://developer.github.com/">Developer API</a></li>
+         <li><a href="http://github.github.com/github-flavored-markdown/">GitHub Flavored Markdown</a></li>
+         <li><a href="http://pages.github.com/">GitHub Pages</a></li>
+       </ul>
+
+     </div><!-- /.site -->
+  </div><!-- /.upper_footer -->
+
+<div class="lower_footer">
+  <div class="site">
+    <!--[if IE]><div id="legal_ie"><![endif]-->
+    <!--[if !IE]--><div id="legal"><!--[endif]-->
+      <ul>
+          <li><a href="https://github.com/site/terms">Terms of Service</a></li>
+          <li><a href="https://github.com/site/privacy">Privacy</a></li>
+          <li><a href="https://github.com/security">Security</a></li>
+      </ul>
+
+      <p>© 2011 <span id="_rrt" title="0.08160s from fe10.rs.github.com">GitHub</span> Inc. All rights reserved.</p>
+    </div><!-- /#legal or /#legal_ie-->
+
+      <div class="sponsor">
+        <a href="http://www.rackspace.com" class="logo">
+          <img alt="Dedicated Server" src="https://a248.e.akamai.net/assets.github.com/images/modules/footer/rackspace_logo.png?v2" height="36" width="38">
+        </a>
+        Powered by the <a href="http://www.rackspace.com%20">Dedicated
+        Servers</a> and<br> <a href="http://www.rackspacecloud.com">Cloud
+        Computing</a> of Rackspace Hosting<span>®</span>
+      </div>
+  </div><!-- /.site -->
+</div><!-- /.lower_footer -->
+
+    </div><!-- /#footer -->
+
+    
+
+<div id="keyboard_shortcuts_pane" class="instapaper_ignore readability-extra" style="display:none">
+  <h2>Keyboard Shortcuts <small><a href="#" class="js-see-all-keyboard-shortcuts">(see all)</a></small></h2>
+
+  <div class="columns threecols">
+    <div class="column first">
+      <h3>Site wide shortcuts</h3>
+      <dl class="keyboard-mappings">
+        <dt>s</dt>
+        <dd>Focus site search</dd>
+      </dl>
+      <dl class="keyboard-mappings">
+        <dt>?</dt>
+        <dd>Bring up this help dialog</dd>
+      </dl>
+    </div><!-- /.column.first -->
+
+    <div class="column middle" style="'display:none'">
+      <h3>Commit list</h3>
+      <dl class="keyboard-mappings">
+        <dt>j</dt>
+        <dd>Move selection down</dd>
+      </dl>
+      <dl class="keyboard-mappings">
+        <dt>k</dt>
+        <dd>Move selection up</dd>
+      </dl>
+      <dl class="keyboard-mappings">
+        <dt>c <em>or</em> o <em>or</em> enter</dt>
+        <dd>Open commit</dd>
+      </dl>
+      <dl class="keyboard-mappings">
+        <dt>y</dt>
+        <dd>Expand URL to its canonical form</dd>
+      </dl>
+    </div><!-- /.column.first -->
+
+    <div class="column last" style="'display:none'">
+      <h3>Pull request list</h3>
+      <dl class="keyboard-mappings">
+        <dt>j</dt>
+        <dd>Move selection down</dd>
+      </dl>
+      <dl class="keyboard-mappings">
+        <dt>k</dt>
+        <dd>Move selection up</dd>
+      </dl>
+      <dl class="keyboard-mappings">
+        <dt>o <em>or</em> enter</dt>
+        <dd>Open issue</dd>
+      </dl>
+    </div><!-- /.columns.last -->
+
+  </div><!-- /.columns.equacols -->
+
+  <div style="'display:none'">
+    <div class="rule"></div>
+
+    <h3>Issues</h3>
+
+    <div class="columns threecols">
+      <div class="column first">
+        <dl class="keyboard-mappings">
+          <dt>j</dt>
+          <dd>Move selection down</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>k</dt>
+          <dd>Move selection up</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>x</dt>
+          <dd>Toggle selection</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>o <em>or</em> enter</dt>
+          <dd>Open issue</dd>
+        </dl>
+      </div><!-- /.column.first -->
+      <div class="column middle">
+        <dl class="keyboard-mappings">
+          <dt>I</dt>
+          <dd>Mark selection as read</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>U</dt>
+          <dd>Mark selection as unread</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>e</dt>
+          <dd>Close selection</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>y</dt>
+          <dd>Remove selection from view</dd>
+        </dl>
+      </div><!-- /.column.middle -->
+      <div class="column last">
+        <dl class="keyboard-mappings">
+          <dt>c</dt>
+          <dd>Create issue</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>l</dt>
+          <dd>Create label</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>i</dt>
+          <dd>Back to inbox</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>u</dt>
+          <dd>Back to issues</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>/</dt>
+          <dd>Focus issues search</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div style="'display:none'">
+    <div class="rule"></div>
+
+    <h3>Issues Dashboard</h3>
+
+    <div class="columns threecols">
+      <div class="column first">
+        <dl class="keyboard-mappings">
+          <dt>j</dt>
+          <dd>Move selection down</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>k</dt>
+          <dd>Move selection up</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>o <em>or</em> enter</dt>
+          <dd>Open issue</dd>
+        </dl>
+      </div><!-- /.column.first -->
+    </div>
+  </div>
+
+  <div style="'display:none'">
+    <div class="rule"></div>
+
+    <h3>Network Graph</h3>
+    <div class="columns equacols">
+      <div class="column first">
+        <dl class="keyboard-mappings">
+          <dt><span class="badmono">←</span> <em>or</em> h</dt>
+          <dd>Scroll left</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt><span class="badmono">→</span> <em>or</em> l</dt>
+          <dd>Scroll right</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt><span class="badmono">↑</span> <em>or</em> k</dt>
+          <dd>Scroll up</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt><span class="badmono">↓</span> <em>or</em> j</dt>
+          <dd>Scroll down</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>t</dt>
+          <dd>Toggle visibility of head labels</dd>
+        </dl>
+      </div><!-- /.column.first -->
+      <div class="column last">
+        <dl class="keyboard-mappings">
+          <dt>shift <span class="badmono">←</span> <em>or</em> shift h</dt>
+          <dd>Scroll all the way left</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>shift <span class="badmono">→</span> <em>or</em> shift l</dt>
+          <dd>Scroll all the way right</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>shift <span class="badmono">↑</span> <em>or</em> shift k</dt>
+          <dd>Scroll all the way up</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>shift <span class="badmono">↓</span> <em>or</em> shift j</dt>
+          <dd>Scroll all the way down</dd>
+        </dl>
+      </div><!-- /.column.last -->
+    </div>
+  </div>
+
+  <div>
+    <div class="rule"></div>
+    <div class="columns threecols">
+      <div class="column first">
+        <h3>Source Code Browsing</h3>
+        <dl class="keyboard-mappings">
+          <dt>t</dt>
+          <dd>Activates the file finder</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>l</dt>
+          <dd>Jump to line</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>w</dt>
+          <dd>Switch branch/tag</dd>
+        </dl>
+        <dl class="keyboard-mappings">
+          <dt>y</dt>
+          <dd>Expand URL to its canonical form</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+
+    <div id="markdown-help" class="instapaper_ignore readability-extra">
+  <h2>Markdown Cheat Sheet</h2>
+
+  <div class="cheatsheet-content">
+
+  <div class="mod">
+    <div class="col">
+      <h3>Format Text</h3>
+      <p>Headers</p>
+      <pre># This is an &lt;h1&gt; tag
+## This is an &lt;h2&gt; tag
+###### This is an &lt;h6&gt; tag</pre>
+     <p>Text styles</p>
+     <pre>*This text will be italic*
+_This will also be italic_
+**This text will be bold**
+__This will also be bold__
+
+*You **can** combine them*
+</pre>
+    </div>
+    <div class="col">
+      <h3>Lists</h3>
+      <p>Unordered</p>
+      <pre>* Item 1
+* Item 2
+  * Item 2a
+  * Item 2b</pre>
+     <p>Ordered</p>
+     <pre>1. Item 1
+2. Item 2
+3. Item 3
+   * Item 3a
+   * Item 3b</pre>
+    </div>
+    <div class="col">
+      <h3>Miscellaneous</h3>
+      <p>Images</p>
+      <pre>![GitHub Logo](/images/logo.png)
+Format: ![Alt Text](url)
+</pre>
+     <p>Links</p>
+     <pre>http://github.com - automatic!
+[GitHub](http://github.com)</pre>
+<p>Blockquotes</p>
+     <pre>As Kanye West said:
+&gt; We're living the future so
+&gt; the present is our past.
+</pre>
+    </div>
+  </div>
+  <div class="rule"></div>
+
+  <h3>Code Examples in Markdown</h3>
+  <div class="col">
+      <p>Syntax highlighting with <a href="http://github.github.com/github-flavored-markdown/" title="GitHub Flavored Markdown" target="_blank">GFM</a></p>
+      <pre>```javascript
+function fancyAlert(arg) {
+  if(arg) {
+    $.facebox({div:'#foo'})
+  }
+}
+```</pre>
+    </div>
+    <div class="col">
+      <p>Or, indent your code 4 spaces</p>
+      <pre>Here is a Python code example
+without syntax highlighting:
+
+    def foo:
+      if not bar:
+        return true</pre>
+    </div>
+    <div class="col">
+      <p>Inline code for comments</p>
+      <pre>I think you should use an
+`&lt;addr&gt;` element here instead.</pre>
+    </div>
+  </div>
+
+  </div>
+</body>
+</html>

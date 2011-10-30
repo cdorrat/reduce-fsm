@@ -602,11 +602,17 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 	 (= 0))
     (catch Exception e false)))
 
-(defmulti ^{:arglists "[fsm]" } show-fsm "Display the fsm as a diagram using graphviz (see http://www.graphviz.org/)" (memoize dot-exists))
-(defmulti ^{:arglists "[fsm filename]"} save-fsm-image "Save the state transition diagram for an fsm as a png.
-Expects the following parameters:
-  - fsm      - the fsm to render
-  - filename - the output file for the png." (memoize dot-exists))
+(defn- no-grapiz-message []
+  (println "The dot executable from graphviz was not found on the path, unable to draw fsm diagrams")
+  (println "Download a copy from http://www.graphviz.org/"))
+
+(defn- graphviz-installed? []
+  (if (dot-exists)
+    true
+    (do 
+      (no-grapiz-message)
+      false)))
+
 
 (defn- dorothy-edge
   "Create a single edeg (transition) in a dorothy graph"
@@ -666,117 +672,20 @@ Expects the following parameters:
 (defn- show-dorothy-fsm [fsm]
   (d/show! (dorothy-fsm-dot fsm)))
 
-(defmethod show-fsm true 
+(defn show-fsm
+  "Display the fsm as a diagram using graphviz (see http://www.graphviz.org/)"
   [fsm]
-  (show-dorothy-fsm fsm))
+  (when (graphviz-installed?)
+    (show-dorothy-fsm fsm)))
   
 
-(defmethod save-fsm-image true 
+(defn save-fsm-image
+    "Save the state transition diagram for an fsm as a png.
+Expects the following parameters:
+  - fsm      - the fsm to render
+  - filename - the output file for the png." 
   [fsm filename]
-  (d/save! (dorothy-fsm-dot fsm) filename {:format :png})
+  (when (graphviz-installed?)
+    (d/save! (dorothy-fsm-dot fsm) filename {:format :png}))
   nil)
-
-
-;; The vijual library would have been a nice alternative to graphviz with no external dependencies
-;; however the current clojars versions seem broken an wont draw directed graphs (even the examples in the documentation)
-;; This implementation should work if the library is fixed
-
-;;(defn- fsm-to-vijual [fsm]
-;;  (mapcat #(map (fn [trans] (vector (:from-state %) (:to-state trans))) (:transitions %))
-;;	  (-> fsm meta ::states)))
-
-;; (defmethod show-fsm false
-;;   [fsm]
-;;   (vijual/draw-directed-graph
-;;    (fsm-to-vijual fsm)))
-
-;; (defmethod save-fsm-image false
-;;   [fsm filename]
-;;   (vijual/save-image
-;;    (vijual/draw-directed-graph-image (fsm-to-vijual fsm))
-;;    filename))
-
-(defn- no-grapiz-message []
-  (println "The dot executable from graphviz was not found on the path, unable to draw fsm diagrams")
-  (println "Download a copy from http://www.graphviz.org/"))
-
-(defmethod show-fsm false [fsm]
-  (no-grapiz-message))
-
-(defmethod save-fsm-image false [fsm]
-  (no-grapiz-message))	   
-
-
-(comment
-  (pprint
-   (create-state-map '[:locked
-		       #"[0-9]" -> {:action store-code} :locked
-		       "*" -> :locked
-		       "#" -> {:guard code-matches :action unlock-door} :unlocked]))
-
-  
-
-  ;; ===================================================================================================
-  ;; sample of searching a log for a sequence of events
-  (defn save-line [state evt from-state to-state]
-    (conj state evt))
-  
-    (deffsm log-search [[:waiting-for-a
-			 #".*event a" -> :seen-a]
-			[:seen-a
-			 #".*event b" -> :waiting-for-c
-			 #".*event c" -> {:action save-line} :waiting-for-a
-			 #".*event d" -> exit-now]
-			[:waiting-for-c
-			 #".*event c" -> :waiting-for-a]])
-  
-  (deffsm log-search [[:waiting-for-a
-		       [#".*event a"] -> :seen-a]
-		      [:seen-a
-		       [#".*event b"] -> :waiting-for-c
-		       [#".*event c"] -> {:action save-line} :waiting-for-a
-		       [#".*event d"] -> exit-now]
-		      [:waiting-for-c
-		       [#".*event c"] -> :waiting-for-a]])
-
-  (log-search [] (ds/read-lines "my-log.txt"))
-  
-  (log-search2 [] ["1 event a" "2 event b" "3 event c" "4 event a" "5 event c" "6 event a"])
-  )
-
-
-;; macro expansion
-(defn save-line [state evt from-state to-state]
-  (conj state evt))
-
-(defn exit-fsm [state]
-  true)
-
-(defn log-search2 [state events]
-  (letfn [(state-waiting-for-a [state [evt & r]]
-			       (if evt
-				 #(match [evt]
-					 [#".*event a"] (state-seen-a state r)
-					 :else (state-waiting-for-a state r))
-				 state))
- 	  (state-seen-a [state [evt & r]]
- 			(if evt
- 			  #(match [evt]
- 				  [#".*event b"] (state-waiting-for-c state r)
- 				  [#".*event c"] (state-waiting-for-a (save-line state evt :seen-a :waiting-for-a) r)
-				  [#".*event d"] (let [new-state (save-line state evt :seen-a "exit-fsm")]
-						   (if (exit-fsm new-state)
-						     new-state
-						     (state-seen-a new-state r)))
- 				  :else (state-seen-a state r))
- 			  state))
- 	  (state-waiting-for-c [state [evt & r]]
- 			       (if [evt]
- 				 #(match [evt]
- 					 [#".*event c"] (state-waiting-for-a  state  r)
-					 :else (state-waiting-for-c state r))
-				 state))]
-    (trampoline state-waiting-for-a state events)))
-
-
 

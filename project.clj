@@ -1,5 +1,5 @@
 
-(defproject reduce-fsm "1.0.0-SNAPSHOT"
+(defproject reduce-fsm "0.1.0-SNAPSHOT"
   :description "Clojure finite state machines"
   :dependencies [[org.clojure/clojure "1.3.0"]
 		 [dorothy "0.0.2"]

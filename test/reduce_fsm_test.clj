@@ -61,9 +61,15 @@
     ))
  
   
-;;(deftest exit-with-state-fn
-;;  (is false "write test for fsm that conditionally exits with a state fn")) 
-
+(deftest exit-with-state-fn
+  (let [inc-val (fn [val & _] (inc val))
+	pong (fn [val] (>= val 3))
+	ping-pong (fsm [[:ping  ;; we oscillate between 2 states, pong exits when the number of transitions >= 3
+			 _ -> {:action inc-val} pong]
+			[pong
+			 _ -> {:action inc-val} :ping]])]
+    (is (= 3 (ping-pong 0 (range 100))))))
+    
 
 (deftest simple-fsm-seq
   (let [emit-evt (fn [acc evt] evt)
@@ -98,76 +104,7 @@
 			      [:suppressing {:pass false}
 			       6 -> :initial]])]
     (is (= [1 2 6 1 2] (filter (a-filter) [1 2 3 4 5 1 2 6 1 2])))))
-  
-
-(comment ;; fix this test
-(deftest test-create-state-map
-	 (let [no-state-parms ['[:from-state :evt -> :to-state]
-			       '[:from-state {:foo 7} -> :to-state]
-			       '[:from-state :evt -> {:action an-action} :to-state]
-			       '[:from-state [:evt _] -> {:action an-action} :to-state]
-			       '[:from-state [:evt (n :when even?)] -> {:action an-action} :to-state]]
-	       with-state-params ['[:from-state {:pass true} :evt -> :to-state]
-				  '[:from-state {:pass true} {:foo 7} -> :to-state]
-				  '[:from-state {:pass true} {:foo 7} -> {:action an-action} :to-state]
-				  '[:from-state {:pass true} [{:foo 7} _] -> {:action an-action} :to-state]
-				  '[:from-state {:pass true} [{:foo 7} (n :when even?)] -> {:action an-action} :to-state]]
-	       state-matches (fn [m from-state state-params evt action to-state]
-			       (and
-				(= from-state (:from-state m))
-				(= state-params (:state-params m))
-				(= evt (-> m :transitions :evt))
-				(= action (-> m :transitions :action))
-				(= to-state (-> m :transitions :to-state))))]
-					       
-			       
-	   
-	   (doseq [p no-state-parms]
-	     (are [from-state state-params evt action to-state] (state-matches (#'reduce-fsm/create-state-map p) from-state state-params evt action to-state)
-		  :from-state nil :evt nil :to-state
-		  :from-state nil '{:foo 7} nil :to-state
-		  :from-state nil :evt  'an-action :to-state
-		  :from-state nil '[:evt _] '{:action an-action} :to-state
-		  :from-state nil '[:evt (n :when even?)] 'an-action :to-state))))
-
-)		  
-     
-
-
-(comment
-  ;; drop all values after we see a 3 until we see a 5
-  (deffsm-filter tst-filter  [[:passing-values {:pass true}
-			       3 => :suppressing-values]
-			      [:suppressing-values {:pass false}
-			       5 => :passing-values]]
-    :dispatch :case)
-
-  
-  
-  (is (= [ 1 2 5 6] (filter tst-filter  [1 2 3 1 2 6 7 5 6])))
-  
-  (defn emit-evt [state evt from to]
-    evt)
-  
-  (deffsm-seq log-seq 
-    [[:waiting-for-a
-      [#".*event a"] -> :waiting-for-b]
-     [:waiting-for-b
-      [#".*event b"] -> :waiting-for-c
-      [#".*event c"] -> {:emit emit-evt} :waiting-for-a]
-     [:waiting-for-c
-      [#".*event c"] -> :waiting-for-a]]
-    :dispatch :match)
-  
-  ;; same as fsm log seq but emits log lines as it finds them
-  ;; :action options can still be used to update internal state
-  (log-seq [event...])
-
-  (deffsm-filter stateful-filter [[:waiting-for-3 {:pass true}
-				   3 => :waiting-for-6]
-				  [:waiting-for-6 {:pass false}
-				   6 => :waiting-for-3]])
-  )
+       
 
 (deftest using-is-terminal
   (let [inc-val (fn [val & _] (inc val))

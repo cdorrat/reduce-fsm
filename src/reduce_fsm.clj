@@ -662,7 +662,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 	fsm-type (->> fsm meta ::fsm-type)]
     (-> (d/digraph
 	 (concat
-	  [[start-state {:label "start" :style :filled :color :black :shape "point" :width 0.2 :height 0.2}]]
+	  [[start-state {:label "start" :style :filled :color :black :shape "point" :width "0.2" :height "0.2"}]]
 	  (map (partial dorothy-state fsm-type) state-map)
 	  [[start-state (-> state-map first :state)]]
 	  (mapcat transitions-for-state state-map)))

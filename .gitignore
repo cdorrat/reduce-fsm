@@ -8,3 +8,5 @@ multi-lib/**
 /target
 /bin
 /classes
+/.classpath
+/.project

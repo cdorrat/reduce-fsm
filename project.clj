@@ -1,5 +1,5 @@
 
-(defproject reduce-fsm "0.1.0-SNAPSHOT"
+(defproject reduce-fsm "0.1.0.baltar-SNAPSHOT"
   :description "Clojure finite state machines"
   :dependencies [[org.clojure/clojure "1.3.0"]
 		 [dorothy "0.0.2"]
@@ -12,6 +12,6 @@
 		      [org.clojure/clojure-contrib "1.2.0"]
 		      [dorothy "0.0.2"]
 		      [match "0.2.0-SNAPSHOT"]]}  
-  :autodoc {:web-src-dir "https://github.com/cdorrat/reduce-fsm/"
-	    :web-home "http://cdorrat.github.com/reduce-fsm/"
+  :autodoc {:web-src-dir "https://github.com/baltar/reduce-fsm"
+	    :web-home "https://github.com/baltar/reduce-fsm"
 	    :output-path "./autodoc/api"})

@@ -627,17 +627,17 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
   "Create a single dorothy state"
   [fsm-type state]
   (let [is-terminal? (if (= :fsm-filter fsm-type)
-		       (not (get (-> state :params) :pass true))
-		       (or (get (-> state :params) :is-terminal false)
-			   (= \( (-> state :name first))))]
+                       (not (get (-> state :params) :pass true))
+                       (or (get (-> state :params) :is-terminal false)
+                           (= \( (-> state :name first))))]
     [(:state state)
      (if is-terminal?       
        {:label (:name state)
-	:style "filled,setlinewidth(2)"
-	:fillcolor "grey88"
-	}
+        :style "filled,setlinewidth(2)"
+        :fillcolor "grey88"
+        }
        {:label (:name state)})
-       ]))
+     ]))
 
 (defn- transitions-for-state
   "return a sequence of dortothy transitions for a single state"

@@ -87,7 +87,7 @@ This package allows you to:
 			       (remove #(= '-> (first %))
 				       (partition-by #(= '-> %) (rest forms))))]
     {:from-state from-state
-     :state-params (when (and (-> forms second map?) (->> forms (drop 3) first (= '->))) (second forms))
+     :state-params (when (-> forms second map?) (second forms))
      :transitions (vec (map create-transition transitions))}))
 
 (defn- create-state-maps
@@ -627,17 +627,17 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
   "Create a single dorothy state"
   [fsm-type state]
   (let [is-terminal? (if (= :fsm-filter fsm-type)
-		       (not (get (-> state :params) :pass true))
-		       (or (get (-> state :params) :is-terminal false)
-			   (= \( (-> state :name first))))]
+                       (not (get (-> state :params) :pass true))
+                       (or (get (-> state :params) :is-terminal false)
+                           (= \( (-> state :name first))))]
     [(:state state)
      (if is-terminal?       
        {:label (:name state)
-	:style "filled,setlinewidth(2)"
-	:fillcolor "grey88"
-	}
+        :style "filled,setlinewidth(2)"
+        :fillcolor "grey88"
+        }
        {:label (:name state)})
-       ]))
+     ]))
 
 (defn- transitions-for-state
   "return a sequence of dortothy transitions for a single state"
@@ -654,23 +654,26 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 			[(:from-state trans) (:to-state trans) {:label (transition-label trans idx)} ])]
     (map format-trans (:transitions state) (range (count (:transitions state))))))
 
-(defn- dorothy-fsm-dot
-  "Create the graphviz dot output for an fsm"
+(defn fsm-dorothy
+  "Create a dorothy digraph definition for an fsm"
   [fsm]
   (let [start-state (keyword (gensym "start-state"))
-	state-map (->> fsm meta ::states)
-	fsm-type (->> fsm meta ::fsm-type)]
-    (-> (d/digraph
-	 (concat
-	  [[start-state {:label "start" :style :filled :color :black :shape "point" :width 0.2 :height 0.2}]]
-	  (map (partial dorothy-state fsm-type) state-map)
-	  [[start-state (-> state-map first :state)]]
-	  (mapcat transitions-for-state state-map)))
-	d/dot)))
+        state-map (->> fsm meta :reduce-fsm/states)
+        fsm-type (->> fsm meta :reduce-fsm/fsm-type)]
+    (d/digraph 
+      (concat
+        [[start-state {:label "start" :style :filled :color :black :shape "point" :width "0.2" :height "0.2"}]]
+        (map (partial dorothy-state fsm-type) state-map)
+        [[start-state (-> state-map first :state)]]
+        (mapcat transitions-for-state state-map)))))
 
+(defn fsm-dot
+  "Create the graphviz dot output for an fsm"
+  [fsm]
+    (d/dot (fsm-dorothy fsm)))
 
 (defn- show-dorothy-fsm [fsm]
-  (d/show! (dorothy-fsm-dot fsm)))
+  (d/show! (fsm-dot fsm)))
 
 (defn show-fsm
   "Display the fsm as a diagram using graphviz (see http://www.graphviz.org/)"
@@ -686,6 +689,6 @@ Expects the following parameters:
   - filename - the output file for the png." 
   [fsm filename]
   (when (graphviz-installed?)
-    (d/save! (dorothy-fsm-dot fsm) filename {:format :png}))
+    (d/save! (fsm-dot fsm) filename {:format :png}))
   nil)
 

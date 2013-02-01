@@ -87,7 +87,7 @@ This package allows you to:
 			       (remove #(= '-> (first %))
 				       (partition-by #(= '-> %) (rest forms))))]
     {:from-state from-state
-     :state-params (when (and (-> forms second map?) (->> forms (drop 3) first (= '->))) (second forms))
+     :state-params (when (-> forms second map?) (second forms))
      :transitions (vec (map create-transition transitions))}))
 
 (defn- create-state-maps

@@ -6,13 +6,12 @@ This package allows you to:
  - Create lazy sequences from state machines (see fsm-seq)
  - Create stateful filter functions for use with filter/remove (see fsm-filter)
  - Visualise state machines as"
-  (:use [clojure.core.match
-	 [core :only [match match-1]]	 
-	 regex])
+  (:use [clojure.core [match :only [match]]])
   (:require
    [clojure [set :as set]]
+   clojure.core.match.regex
    [dorothy [core :as d]]
-	    [clojure [string :as str]])
+   [clojure [string :as str]])
   )
 
 (defn- fsm-fn?
@@ -144,7 +143,7 @@ Parameters:
 
 (defn- expand-dispatch [dispatch-type evt acc]
   (case dispatch-type
-	:event-only [`match-1 evt]
+	:event-only [`match evt]
 	:event-and-acc   [`match [acc evt]]
 	(throw (RuntimeException. "unknown fsm dispatch type, expected one of [:event-only :event-and-acc]"))))
   
@@ -213,14 +212,14 @@ Parameters:
 ;;      (letfn [(state-waiting-for-a
 ;; 	      [acc events]
 ;; 	      (if-let [evt (first events)]
-;; 		#(match-1 evt
+;; 		#(match evt
 ;; 			  #".*event a" (state-waiting-for-b evt (rest events))
 ;; 			  :else        (state-waiting-for-a evt (rest events)))
 ;; 		acc))
 ;; 	     (state-waiting-for-b
 ;; 	      [acc events]
 ;; 	      (if-let [evt (first events)]       
-;; 		#(match-1 evt
+;; 		#(match evt
 ;; 			  #".*event d" (state-waiting-for-a acc (rest events))
 ;; 			  #".*event c" (let [new-acc ((fn [acc evt & _] (conj acc evt)) acc evt :waiting-for-b :waiting-for-a)]
 ;; 					 (state-waiting-for-a new-acc (rest events)))
@@ -243,7 +242,7 @@ Parmaters:
  fsm-opts - the following options are recognised:
   :default-acc val - sets the initial value for the accumulator in the single arity version of the function
   :dispatch - changes the way events are matched, the follow options are accepted:
-    - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
+    - :event-only (default) - events are matched using the  core.match/match syntax against the event only
     - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
 
 FSM definitions:
@@ -336,12 +335,12 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 ;;
 ;; (letfn [(state-initial [acc]
 ;; 	 (fn [evt]
-;; 	   (match-1 evt
+;; 	   (match evt
 ;; 		    3 [false (state-suppressing acc)]
 ;; 		    :else [true (state-initial acc)])))
 ;; 	(state-suppressing [acc]
 ;; 	 (fn  [evt]
-;; 	   (match-1 evt
+;; 	   (match evt
 ;; 		    6 [true (state-initial acc)]
 ;; 		    :else  [false (state-suppressing acc)])))]
 ;;   (fn filter-builder
@@ -367,7 +366,7 @@ fsm      - the fsm definition (see below for syntax)
 fsm-opts - the following options are recognised:
   :default-acc val - sets the initial value for the accumulator in the single arity version function
   :dispatch - changes the way events are matched, the follow options are accepted:
-    - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
+    - :event-only (default) - events are matched using the  core.match/match syntax against the event only
     - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
 
 FSM definitions:
@@ -497,20 +496,20 @@ Example:
 ;;  (letfn [(state-waiting-for-a
 ;; 	  [acc events]
 ;; 	  (when (seq events)
-;; 	    #(match-1 (first events)
+;; 	    #(match (first events)
 ;; 		      #".*event a"  [::no-event  (state-waiting-for-b acc (rest events))]
 ;; 		      :else [::no-event (state-waiting-for-a acc (rest events))])))
 ;; 	 (state-waiting-for-b
 ;; 	  [acc events]
 ;; 	  (when (seq events)
-;; 	    #(match-1 (first events)
+;; 	    #(match (first events)
 ;; 		      #".*event b" [::no-event (state-waiting-for-c acc (rest events))]
 ;; 		      #".*event c" [(emit-evt acc (first events)) (state-waiting-for-a acc (rest events))]
 ;; 		      :else [::no-event (state-waiting-for-b acc (rest events))])))	
 ;; 	 (state-waiting-for-c
 ;; 	  [acc events]
 ;; 	  (when (seq events)
-;; 	    #(match-1  (first events)
+;; 	    #(match  (first events)
 ;; 		       #".*event c" [::no-event (state-waiting-for-a acc (rest events))]
 ;; 		       :else [::no-event (state-waiting-for-c acc (rest events))])))]
 ;;   (fn fsm-seq-fn
@@ -539,7 +538,7 @@ Parmaters:
  fsm-opts - the following options are recognised:
   :default-acc val - sets the initial value for the acculator in the single arity version of the function
   :dispatch - changes the way events are matched, the follow options are accepted:
-    - :event-only (default) - events are matched using the  core.match/match-1 syntax against the event only
+    - :event-only (default) - events are matched using the  core.match/match syntax against the event only
     - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
 
 FSM definitions:

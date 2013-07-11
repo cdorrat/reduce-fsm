@@ -44,12 +44,12 @@
   (let [save-to-state (fn [acc evt from to] (conj acc to))
 	an-fsm (fsm
 		[[:initial 
-		  (n :when #(< % 5)) -> {:action save-to-state} :small
-		  (n :when even?) -> {:action save-to-state} :even]  ;; match guards take the last value if multiple match?
+		  (n :guard #(< % 5)) -> {:action save-to-state} :small
+		  (n :guard even?) -> {:action save-to-state} :even]  ;; match guards take the last value if multiple match?
 		 [:small
 		  1 -> {:action save-to-state} :initial]
 		 [:even
-		  (n :when odd?) -> {:action save-to-state} :initial]])]
+		  (n :guard odd?) -> {:action save-to-state} :initial]])]
     (is (= [:even :initial :small :initial] (an-fsm [] [8 2 4 3 1 2 2 1])))))
 
 

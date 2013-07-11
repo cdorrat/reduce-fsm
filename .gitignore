@@ -5,3 +5,8 @@ pom.xml
 .lein-failures
 multi-lib/**
 *.jar
+/target
+/bin
+/classes
+/.classpath
+/.project

@@ -154,3 +154,81 @@
 			         
     )  
 
+
+;;===================================================================================================
+;; fsm-inc tests
+
+(deftest simple-incremental-fsm
+  (let [an-fsm (fsm-inc [[:waiting-for-a
+                       \a -> :waiting-for-b]
+                      [:waiting-for-b
+                       \b -> :done
+                       _ -> :waiting-for-a]
+                      [:done {:is-terminal true}]])
+        fsm-state (atom (an-fsm))]
+
+    (is (= :waiting-for-a (:state @fsm-state)))
+
+    (swap! fsm-state fsm-event \a)
+    (is (= :waiting-for-b (:state @fsm-state)))
+
+    (swap! fsm-state fsm-event \b)
+    (is (= :done (:state @fsm-state)))))
+
+(defsm-inc inc-log-fsm
+  [[:waiting-for-a
+    #".*event a" -> :waiting-for-b]
+   [:waiting-for-b
+    #".*event b" -> :waiting-for-c
+    #".*event c" -> {:action test-save-line} :waiting-for-a]
+   [:waiting-for-c
+    #".*event c" -> :waiting-for-a]])
+
+
+(deftest simple-fsm-inc-behaviour 
+  (are [res acc events] (= res (:value (reduce fsm-event (inc-log-fsm acc) events)))
+       ["5 event c"]  []  ["1 event a" "event x" "2 event b" "3 event c" "4 event a" "event x" "5 event c" "6 event a"]
+       nil nil ["0 event c" "1 event a" "2 event b" "3 event c"]
+       [] [] ["0 event c" "1 event a" "2 event b" "3 event c" ]))
+   
+(deftest dispatch-inc-with-acc
+  (let [an-fsm (fsm-inc
+		[[:waiting-for-a
+		  [_ #".*event a"] -> :waiting-for-b]
+		 [:waiting-for-b
+		  [_ #".*event b"] -> :waiting-for-c
+		  [_ #".*event c"] -> {:action test-save-line} :waiting-for-a]
+		 [:waiting-for-c
+		  [_ #".*event c"] -> :waiting-for-a]] :dispatch :event-and-acc)]
+
+  (are [res acc events] (= res (:value (reduce fsm-event (an-fsm acc) events)))
+       ["5 event c"]  []  ["1 event a" "event x" "2 event b" "3 event c" "4 event a" "event x" "5 event c" "6 event a"]
+       nil nil ["0 event c" "1 event a" "2 event b" "3 event c"]
+       [] [] ["0 event c" "1 event a" "2 event b" "3 event c" ])))
+
+(deftest single-inc-dispatch-with-when
+  (let [an-fsm (fsm-inc
+		[[:initial 
+		  (n :guard #(< % 5)) -> :small
+		  (n :guard even?) -> :even]  ;; match guards take the last value if multiple match?
+		 [:small
+		  1 -> :initial]
+		 [:even
+		  (n :guard odd?) -> :initial]])]
+
+    (is (= [:initial :even :even :even :initial :small :small :small :initial] 
+           (map :state (reductions fsm-event (an-fsm) [8 2 4 3 1 2 2 1]))))))
+
+  
+(deftest inc-exit-with-state-fn
+  (let [inc-val (fn [val & _] (inc val))
+	pong (fn [val] (>= val 3))
+	ping-pong (fsm-inc [[:ping  ;; we oscillate between 2 states, pong exits when the number of transitions >= 3
+			 _ -> {:action inc-val} pong]
+			[pong
+			 _ -> {:action inc-val} :ping]])]
+    (is (= 3
+           (:value
+            (first 
+             (drop-while (complement :is-terminated?) 
+                         (reductions fsm-event (ping-pong 0) (range 100)))))))))

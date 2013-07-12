@@ -102,11 +102,19 @@ This package allows you to:
   "Create a name for the internal fuction that will represent this state.
    We want it to be recognisable to the user so stack traces are more intelligible"
   [sym]
-  (let [name (cond
-	      (fn? sym) (-> sym meta :name str)
-	      (keyword? sym) (name sym)
-	      :else (str sym))]
-    (gensym (str "state" "-" name "-"))))
+  (cond
+   (fn? sym) (let [fn-name (-> sym meta :name str)]
+               (if (empty? fn-name)
+                 (str (gensym "fn-"))
+                 fn-name))
+   (keyword? sym) (name sym)
+   :else (str sym)))
+
+(defn- state-fn-symbol
+  "Create a name for the internal fuction that will represent this state.
+   We want it to be recognisable to the user so stack traces are more intelligible"
+  [sym]
+  (gensym (str "state" "-" (state-fn-name sym) "-")))
 
 (defn- state-for-action [state]
   (cond
@@ -138,8 +146,8 @@ Parameters:
 	  (fsm-fn? (:to-state evt-map))           ;; if the target state is a function we need to check for early conditional termination
 	  `(if (~(:to-state evt-map) ~new-acc)    ;; truthy return from a state function causes the fsm to exit
 	     ~new-acc
-	     (~target-state-fn ~new-acc (rest ~events)))
-	  :else `(~target-state-fn ~new-acc (rest ~events))))])) ;; normal (keyword/non-terminal) states
+	     (partial ~target-state-fn ~new-acc (rest ~events)))
+	  :else `(partial ~target-state-fn ~new-acc (rest ~events))))])) ;; normal (keyword/non-terminal) states
 
 (defn- expand-dispatch [dispatch-type evt acc]
   (case dispatch-type
@@ -159,7 +167,7 @@ Parameters:
       (if-let [~evt (first ~events)] 
 	#(~@(expand-dispatch dispatch-type evt acc)
 		~@(mapcat (partial expand-evt-dispatch state-fn-map state-params (:from-state state)  evt acc events) (:transitions state))
-		:else (~this-state-fn ~acc (rest ~events))
+		:else (partial ~this-state-fn ~acc (rest ~events))
 		)
 	~acc))))
   
@@ -209,21 +217,19 @@ Parameters:
 ;;   ([events]
 ;;    (the-fsm nil events))
 ;;   ([acc events]
-;;      (letfn [(state-waiting-for-a
-;; 	      [acc events]
+;;      (letfn [(state-waiting-for-a  [acc events]
 ;; 	      (if-let [evt (first events)]
 ;; 		#(match evt
-;; 			  #".*event a" (state-waiting-for-b evt (rest events))
-;; 			  :else        (state-waiting-for-a evt (rest events)))
+;; 			  #".*event a" (partial state-waiting-for-b evt (rest events))
+;; 			  :else        (partial state-waiting-for-a evt (rest events)))
 ;; 		acc))
-;; 	     (state-waiting-for-b
-;; 	      [acc events]
+;; 	     (state-waiting-for-b  [acc events]
 ;; 	      (if-let [evt (first events)]       
 ;; 		#(match evt
-;; 			  #".*event d" (state-waiting-for-a acc (rest events))
+;; 			  #".*event d" (partial state-waiting-for-a acc (rest events))
 ;; 			  #".*event c" (let [new-acc ((fn [acc evt & _] (conj acc evt)) acc evt :waiting-for-b :waiting-for-a)]
-;; 					 (state-waiting-for-a new-acc (rest events)))
-;; 			  :else (state-waiting-for-b acc (rest events)))
+;; 					 (partial state-waiting-for-a new-acc (rest events)))
+;; 			  :else (partial state-waiting-for-b acc (rest events)))
 ;; 		acc))]
 ;;        (trampoline state-waiting-for-a acc events))))
 (defmacro fsm
@@ -273,7 +279,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
   (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
 	state-maps  (create-state-maps states)
 	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
-	state-fn-names (map state-fn-name (map :from-state state-maps))
+	state-fn-names (map state-fn-symbol (map :from-state state-maps))
 	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name    
     `(with-meta
        (fn the-fsm#
@@ -290,6 +296,97 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
    see reduce-fsm/fsm for details"
   [fsm-name states & opts]
   `(def ~fsm-name (fsm ~states ~@opts)))
+
+;;===================================================================================================
+;; support for incremental fsms
+(defn- state-disp-name [sym]
+  (keyword (state-fn-name sym)))
+
+(defn- expand-inc-evt-dispatch
+  "Expand the dispatch of a single event for incremental fsms, this corresponds to a single case in the match expression.
+Parameters:
+  state-fn-map - a map of state-symbol -> name of implementing function
+  state-params - maps of state-symbol -> {:param1 ..} 
+  from-state   - the state we're transitioning from
+  evt          - the name of the event parameter in the match statement
+  acc          - the name of the accumulator parameter in the match statement
+  events       - the sequence of events
+  evt-map      - the map representing this transition, eg. {:to-state x :action .... }"
+  [state-fn-map state-params from-state evt acc events evt-map]
+  (let [new-acc (gensym "new-acc")]
+    `[~(:evt evt-map)
+      (let [~new-acc ~(if (:action evt-map)
+                        `(~(:action evt-map) ~acc ~evt ~(state-for-action from-state) ~(state-for-action (:to-state evt-map)))
+                        acc)]
+        {:state ~(state-disp-name (:to-state evt-map))
+         :value ~new-acc
+         :fsm ~(state-fn-map (:to-state evt-map))
+         :is-terminated? ~(if (fsm-fn? (:to-state evt-map)) ;; if the target state is a fn exit on truthy value
+                               `(~(:to-state evt-map) ~new-acc)
+                               (if (-> evt-map :to-state state-params :is-terminal)
+                                 true
+                                 false))})]))
+
+(defn- inc-state-fn-impl
+  "define the function used to represent a single state internally for incremantal fsms"
+  [dispatch-type state-fn-map state-params state]
+  (let [this-state-fn  (state-fn-map (:from-state state))
+	events (gensym "events")
+	acc (gensym "acc")
+	evt (gensym "evt")]
+    `(~this-state-fn  [~acc ~evt]
+	(~@(expand-dispatch dispatch-type evt acc)
+         ~@(mapcat (partial expand-inc-evt-dispatch state-fn-map state-params (:from-state state)  evt acc events) (:transitions state))
+         :else  {:state ~(state-disp-name (:from-state state))
+                 :is-terminated? false
+                 :value ~acc
+                 :fsm ~ this-state-fn}))))
+  
+(defmacro fsm-inc
+  "Define an incremental finite state machine.
+State definitions and capabilities are the same as reduce-fsm/fsm but events 
+ are provided by calls to (fsm-event inc-fsm event) instead of a sequece.
+Returns a function that takes the intial accumulator value (or none for the default nil) and returns an incremental fsm.
+Subsequent chained calls to  fsm-event will move the fsm thought it's states.
+ (reduce fsm-event ((inc-fsm [... fsm def ..])) events)
+ is equivalent to 
+ (fsm [... fsm def ..] events)"
+  [states & fsm-opts]
+  (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
+	state-maps  (create-state-maps states)
+	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
+	state-fn-names (map state-fn-symbol (map :from-state state-maps))
+	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name    
+    `(with-meta
+       (fn the-fsm#
+         ([] (the-fsm# ~default-acc))
+         ([acc#]
+            (letfn [~@(map #(inc-state-fn-impl dispatch state-fn-map state-params %) state-maps)]
+              {:state ~(state-disp-name (-> state-maps first :from-state))
+               :is-terminated? false
+               :value acc#
+               :fsm ~(first state-fn-names)}
+              )))
+       ~(fsm-metadata :inc-fsm state-maps))))
+
+
+(defn fsm-event 
+  "process a single event with an incremental finite state machine (those created with fsm-inc or defsm-inc)
+Returns a map with the following keys:
+  :state          - the current state of the fsm after processing the event
+  :value          - the current accumulator value
+  :is-terminated? - true when the fsm is in a terminal state and no more events can be processed"
+  [fsm event]
+  {:pre [(map? fsm) (contains? fsm :fsm)]} ;; only valid for incremental fsms
+  (if (:is-terminated? fsm)
+    fsm
+    ((:fsm fsm) (:value fsm) event)))
+
+(defmacro defsm-inc   
+"A convenience macro to define an incremental fsm, equivalent to (def fsm-name (fsm-inc states opts)
+   see reduce-fsm/fsm-inc for details"
+[fsm-name states & opts]
+`(def ~fsm-name (fsm-inc ~states ~@opts)))
 
 ;;===================================================================================================
 ;; fsm-filter impl
@@ -400,7 +497,7 @@ Example:
   [states & fsm-opts]
   (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
 	state-maps  (create-state-maps states)
-	state-fn-names (map state-fn-name (map :from-state state-maps))
+	state-fn-names (map state-fn-symbol (map :from-state state-maps))
 	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
 	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name
     `(letfn [~@(map #(state-filter-fn-impl dispatch state-fn-map state-params %) state-maps)]
@@ -569,7 +666,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
   [states & fsm-opts]
   (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
 	state-maps  (create-state-maps states)
-	state-fn-names (map state-fn-name (map :from-state state-maps))
+	state-fn-names (map state-fn-symbol (map :from-state state-maps))
 	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
 	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name
     `(letfn [~@(map #(state-seq-fn-impl dispatch state-fn-map state-params %) state-maps)]

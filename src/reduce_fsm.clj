@@ -153,7 +153,8 @@ Parameters:
   (case dispatch-type
 	:event-only [`match evt]
 	:event-and-acc   [`match [acc evt]]
-	(throw (RuntimeException. "unknown fsm dispatch type, expected one of [:event-only :event-and-acc]"))))
+        :event-acc-vec [`match [[acc evt]]]
+	(throw (RuntimeException. "unknown fsm dispatch type, expected one of [:event-only :event-and-acc :event-acc-vec]"))))
   
 (defn- state-fn-impl
   "define the function used to represent a single state internally"

@@ -251,6 +251,7 @@ Parmaters:
   :dispatch - changes the way events are matched, the follow options are accepted:
     - :event-only (default) - events are matched using the  core.match/match syntax against the event only
     - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
+    - :event-acc-vec        - events are matches against a single vector of [[acc-value event]]
 
 FSM definitions:
  fsm's are defined as follows:

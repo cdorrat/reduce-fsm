@@ -232,3 +232,22 @@
             (first 
              (drop-while (complement :is-terminated?) 
                          (reductions fsm-event (ping-pong 0) (range 100)))))))))
+
+
+(deftest event-acc-vec-dispatch 
+  (let [should-transition? (fn [[state event]] (= (* state 2) event))
+        event-is-even? (fn [[state event]] (even? event))
+        inc-count (fn [cnt & _ ] (inc cnt))
+        reset-count (fn [& _]  100)
+        even-example (fsm  
+	   [[:start
+	     [_ :guard should-transition?] -> {:action reset-count} :next-state
+	     [_ :guard event-is-even?] -> {:action inc-count} :start]
+	    [:next-state ,,,]]
+	   :default-acc  0
+	   :dispatch :event-acc-vec)]
+
+    (are [events res] (= res (even-example events))
+         [1 1 2] 1        ;;  (the number of even events)
+         [1 2 2 4] 100)))  ;; 0 (we transitioned to next state)
+  

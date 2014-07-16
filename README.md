@@ -51,7 +51,7 @@ The following example counts the number of times "ab" occurs in a sequence.
 (map (partial count-ab 0) ["abaaabc" "aaacb" "bbbcab"])
 ;; returns => (2 0 1)
 
-(show-fsm count-ab)
+(fsm/show-fsm count-ab)
 ;; displays the fsm diagram below
 
 ```
@@ -125,7 +125,7 @@ adds the unexpected event to the output sequence.
 
 ;; returns => ("5 event c" "5 event c")
 
-(show-fsm log-search)
+(fsm/show-fsm log-search)
 ;; displays the image below
 
 ```
@@ -150,7 +150,7 @@ The following example suppresses values from the time a 3 is encountered until w
 (filter (sample-filter) [1 2 3 4 5 1 2 6 1 2])
 ;; returns => (1 2 6 1 2)
 
-(show-fsm sample-filter)
+(fsm/show-fsm sample-filter)
 ;; displays the diagram below
 ```
 

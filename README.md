@@ -22,7 +22,7 @@ Events are dispatched with core.match and allow the use of all match features (g
 The fastest way to use this library is with Leiningen or Cake. Add the following to your project.clj dependencies:
 
 ```clojure
-[reduce-fsm "0.1.0"]
+[reduce-fsm "0.1.2"]
 ```
 
 Use via:

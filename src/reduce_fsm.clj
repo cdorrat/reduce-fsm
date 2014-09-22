@@ -1,5 +1,5 @@
 (ns reduce-fsm
-  "Generate and display functional finite state machines that accumumlate state
+  "Generate and display functional finite state machines that accumulate state
 in the same way as reduce.
 This package allows you to:
  - Create basic fsm's (see fsm)
@@ -11,8 +11,7 @@ This package allows you to:
    [clojure [set :as set]]
    clojure.core.match.regex
    [dorothy [core :as d]]
-   [clojure [string :as str]])
-  )
+   [clojure [string :as str]]))
 
 (defn- fsm-fn?
   "return true if the symbol will be treated as a function in fsm state definitions."
@@ -40,7 +39,7 @@ This package allows you to:
 
     ;; all targets of a transition must exist
     (doseq [{:keys [from-state to-state]} transitions]
-      (when-not (state-names to-state)	
+      (when-not (state-names to-state)
 	(report-compile-error "The state %s was referenced in a transition from %s but does not exist" to-state from-state)))
     
     ;; all states except for the first should be reachable by a transition
@@ -51,21 +50,20 @@ This package allows you to:
     
     ;; check for unexpected keys in transition properties
     (let [user-keys #{:emit :action}
-	  expected-keys (into #{:from-state :to-state :evt} user-keys)]      
+	  expected-keys (into #{:from-state :to-state :evt} user-keys)]
       (doseq [t transitions]
 	(let [xtra-keys (set/difference (-> t keys set) expected-keys)]
-	  (when-not (empty? xtra-keys)
+	  (when (seq xtra-keys)
 	    (report-compile-warning "The key(s) %s was/were used in a transition from state %s, we only one expected or more of %s"
 				    xtra-keys (:from-state t) user-keys)))))
     
     ;; check for unexpected keys in state params
     (let [expected-keys #{:pass :is-terminal}]
-      (doseq [s state-maps]	
+      (doseq [s state-maps]
 	(let [xtra-keys (set/difference (-> s :state-params keys set) expected-keys)]
-	  (when-not (empty? xtra-keys)
+	  (when (seq xtra-keys)
 	    (report-compile-warning "The key(s) %s was used in the state parameters for %s, we only expected one or more of %s"
-				    xtra-keys (:from-state s) expected-keys)))))    
-    ))
+				    xtra-keys (:from-state s) expected-keys)))))))
 
 (defn- create-transition
   "create a single transition make with default params if none specified.
@@ -74,7 +72,7 @@ This package allows you to:
   (let [has-params? (map? (first to))
 	params (if has-params? (first to) {})
 	to-state (if has-params? (second to) (first to))]
-    (assoc params 
+    (assoc params
       :evt (last from)
       :to-state to-state)))
 
@@ -99,7 +97,7 @@ This package allows you to:
   
 
 (defn- state-fn-name
-  "Create a name for the internal fuction that will represent this state.
+  "Create a name for the internal function that will represent this state.
    We want it to be recognisable to the user so stack traces are more intelligible"
   [sym]
   (cond
@@ -111,7 +109,7 @@ This package allows you to:
    :else (str sym)))
 
 (defn- state-fn-symbol
-  "Create a name for the internal fuction that will represent this state.
+  "Create a name for the internal function that will represent this state.
    We want it to be recognisable to the user so stack traces are more intelligible"
   [sym]
   (gensym (str "state" "-" (state-fn-name sym) "-")))
@@ -127,7 +125,7 @@ This package allows you to:
   "Expand the dispatch of a single event, this corresponds to a single case in the match expression.
 Parameters:
   state-fn-map - a map of state-symbol -> name of implementing function
-  state-params - maps of state-symbol -> {:param1 ..} 
+  state-params - maps of state-symbol -> {:param1 ..}
   from-state   - the state we're transitioning from
   evt          - the name of the event parameter in the match statement
   acc          - the name of the accumulator parameter in the match statement
@@ -135,8 +133,7 @@ Parameters:
   evt-map      - the map representing this transition, eg. {:to-state x :action .... }"
   [state-fn-map state-params from-state evt acc events evt-map]
   (let [target-state-fn (state-fn-map (:to-state evt-map))
-	new-acc (gensym "new-acc")]   
-    
+	new-acc (gensym "new-acc")]
     `[~(:evt evt-map)
       (let [~new-acc ~(if (:action evt-map)
 			`(~(:action evt-map) ~acc ~evt ~(state-for-action from-state) ~(state-for-action (:to-state evt-map)))
@@ -165,7 +162,7 @@ Parameters:
 	evt (gensym "evt")]
     `(~this-state-fn
       [~acc ~events]
-      (if-let [~evt (first ~events)] 
+      (if-let [~evt (first ~events)]
 	#(~@(expand-dispatch dispatch-type evt acc)
 		~@(mapcat (partial expand-evt-dispatch state-fn-map state-params (:from-state state)  evt acc events) (:transitions state))
 		:else (partial ~this-state-fn ~acc (rest ~events))
@@ -176,7 +173,7 @@ Parameters:
 (defn- transitions-metadata
   "create the metadata representation of all transitions for a single state"
   [state]
-   (let [from-state (keyword (:from-state state))]    
+   (let [from-state (keyword (:from-state state))]
      (map (fn [t]
  	   (let [trans (dissoc t :from-state :to-state)] ;; convert all non-state params into strings
  	     (assoc (zipmap (keys trans) (map (fn [x] `'~x) (vals trans)))
@@ -186,22 +183,20 @@ Parameters:
 
 (defn- state-metadata
   "create the metadata representation for a single state"
-  [state]	 
+  [state]
   {:state  (keyword (:from-state state))
    :name (if (fsm-fn? (:from-state state))
 		  (str "(" (:from-state state) ")")
 		  (str (:from-state state)))
    :params (:state-params state)
-   :transitions  (vec (transitions-metadata state))
-   })
+   :transitions  (vec (transitions-metadata state))})
 
 
 (defn- fsm-metadata
   "Create the metadata for the fsm. We'll use this at runtime to draw diagrams of the fsm"
   [fsm-type state-maps]
   {::fsm-type fsm-type
-   ::states (vec (map state-metadata state-maps))
-   })
+   ::states (vec (map state-metadata state-maps))})
 
 ;;===================================================================================================
 ;; We want to turn an fsm definition looking like this:
@@ -212,7 +207,7 @@ Parameters:
 ;;        #".*event d" -> :waiting-for-a
 ;;        #".*event c" -> {:action (fn [acc evt & _] (conj acc evt))} :waiting-for-a]])
 ;;
-;; into the following trampoline based inplementation:
+;; into the following trampoline based implementation:
 ;;
 ;; (fn the-fsm
 ;;   ([events]
@@ -225,7 +220,7 @@ Parameters:
 ;; 			  :else        (partial state-waiting-for-a evt (rest events)))
 ;; 		acc))
 ;; 	     (state-waiting-for-b  [acc events]
-;; 	      (if-let [evt (first events)]       
+;; 	      (if-let [evt (first events)]
 ;; 		#(match evt
 ;; 			  #".*event d" (partial state-waiting-for-a acc (rest events))
 ;; 			  #".*event c" (let [new-acc ((fn [acc evt & _] (conj acc evt)) acc evt :waiting-for-b :waiting-for-a)]
@@ -244,7 +239,7 @@ The generated function will return when one of the following is true:
  - The fsm reaches a terminal state
  - The fsm reaches a state defined by a function and it returns a truthy value
 
-Parmaters:
+Parameters:
  fsm      - the fsm definition (see below for syntax)
  fsm-opts - the following options are recognised:
   :default-acc val - sets the initial value for the accumulator in the single arity version of the function
@@ -272,17 +267,17 @@ State and Event Functions:
  Event functions are called with (event-fn acc event from-state to-state) where
    acc        - is the current accumulated state
    event      - is the event that fired the transition
-   from-state - the state we're transitionin from
+   from-state - the state we're transitioning from
    to-state   - the state we're transitioning to
 
 See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 
   [states & fsm-opts]
-  (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
+  (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts
 	state-maps  (create-state-maps states)
 	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
 	state-fn-names (map state-fn-symbol (map :from-state state-maps))
-	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name    
+	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name
     `(with-meta
        (fn the-fsm#
 	([events#] (the-fsm# ~default-acc events#))
@@ -290,8 +285,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 	  (letfn [~@(map #(state-fn-impl dispatch state-fn-map state-params %) state-maps)]
 	    (trampoline ~(first state-fn-names) acc# events#)
 	    )))
-       ~(fsm-metadata :fsm state-maps)
-       )))
+       ~(fsm-metadata :fsm state-maps))))
 
 (defmacro defsm
   "A convenience macro to define a fsm, equivalent to (def fsm-name (fsm states opts)
@@ -308,7 +302,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
   "Expand the dispatch of a single event for incremental fsms, this corresponds to a single case in the match expression.
 Parameters:
   state-fn-map - a map of state-symbol -> name of implementing function
-  state-params - maps of state-symbol -> {:param1 ..} 
+  state-params - maps of state-symbol -> {:param1 ..}
   from-state   - the state we're transitioning from
   evt          - the name of the event parameter in the match statement
   acc          - the name of the accumulator parameter in the match statement
@@ -330,7 +324,7 @@ Parameters:
                                  false))})]))
 
 (defn- inc-state-fn-impl
-  "define the function used to represent a single state internally for incremantal fsms"
+  "define the function used to represent a single state internally for incremental fsms"
   [dispatch-type state-fn-map state-params state]
   (let [this-state-fn  (state-fn-map (:from-state state))
 	events (gensym "events")
@@ -346,19 +340,19 @@ Parameters:
   
 (defmacro fsm-inc
   "Define an incremental finite state machine.
-State definitions and capabilities are the same as reduce-fsm/fsm but events 
- are provided by calls to (fsm-event inc-fsm event) instead of a sequece.
+State definitions and capabilities are the same as reduce-fsm/fsm but events
+ are provided by calls to (fsm-event inc-fsm event) instead of a sequence.
 Returns a function that takes the intial accumulator value (or none for the default nil) and returns an incremental fsm.
 Subsequent chained calls to  fsm-event will move the fsm thought it's states.
  (reduce fsm-event ((inc-fsm [... fsm def ..])) events)
- is equivalent to 
+ is equivalent to
  (fsm [... fsm def ..] events)"
   [states & fsm-opts]
-  (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
+  (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts
 	state-maps  (create-state-maps states)
 	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
 	state-fn-names (map state-fn-symbol (map :from-state state-maps))
-	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name    
+	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name
     `(with-meta
        (fn the-fsm#
          ([] (the-fsm# ~default-acc))
@@ -372,7 +366,7 @@ Subsequent chained calls to  fsm-event will move the fsm thought it's states.
        ~(fsm-metadata :inc-fsm state-maps))))
 
 
-(defn fsm-event 
+(defn fsm-event
   "process a single event with an incremental finite state machine (those created with fsm-inc or defsm-inc)
 Returns a map with the following keys:
   :state          - the current state of the fsm after processing the event
@@ -384,7 +378,7 @@ Returns a map with the following keys:
     fsm
     ((:fsm fsm) (:value fsm) event)))
 
-(defmacro defsm-inc   
+(defmacro defsm-inc
 "A convenience macro to define an incremental fsm, equivalent to (def fsm-name (fsm-inc states opts)
    see reduce-fsm/fsm-inc for details"
 [fsm-name states & opts]
@@ -394,13 +388,12 @@ Returns a map with the following keys:
 ;; fsm-filter impl
 
 (defn- expand-filter-evt-dispatch
-  "Expand the dispatch line for a single fsm-filter dipatch line.
+  "Expand the dispatch line for a single fsm-filter dispatch line.
    The return value corresponds to a single case in a match clause"
   [state-fn-map state-params from-state evt acc evt-map]
   (let [target-state-fn (state-fn-map (:to-state evt-map))
 	target-pass-val (-> evt-map :to-state state-params (get :pass true))
-	new-acc (gensym "new-acc")]   
-    
+	new-acc (gensym "new-acc")]
     `[~(:evt evt-map)
       (let [~new-acc ~(if (:action evt-map)
 			`(~(:action evt-map) ~acc ~evt ~(state-for-action from-state) ~(state-for-action (:to-state evt-map)))
@@ -413,19 +406,17 @@ Returns a map with the following keys:
   [dispatch-type state-fn-map state-params state]
   (let [this-state-fn  (state-fn-map (:from-state state))
 	acc (gensym "acc")
-	evt (gensym "evt")] 
+	evt (gensym "evt")]
     `(~this-state-fn
       [~acc]
       (fn [~evt]
 	(~@(expand-dispatch dispatch-type evt acc)
-	 ~@(mapcat (partial expand-filter-evt-dispatch state-fn-map state-params (:from-state state) evt acc) (:transitions state)) 
-	 :else [~(get (:state-params state) :pass true) (~this-state-fn ~acc)]
-	))
-	)))
+	 ~@(mapcat (partial expand-filter-evt-dispatch state-fn-map state-params (:from-state state) evt acc) (:transitions state))
+	 :else [~(get (:state-params state) :pass true) (~this-state-fn ~acc)])))))
 
 ;;===================================================================================================
 ;; We want to turn the following filter definition:
-;; (fsm-filter [[:initial 
+;; (fsm-filter [[:initial
 ;; 	      3 -> :suppressing]
 ;; 	     [:suppressing {:pass false}
 ;; 	      6 -> :initial]])
@@ -450,17 +441,17 @@ Returns a map with the following keys:
 ;;       (let [[pass next-state] (@curr-state evt)]
 ;;        (reset! curr-state next-state)
 ;;        pass))))))
-;; 
-(defmacro fsm-filter 
+;;
+(defmacro fsm-filter
 "Returns a function that returns fsm filters suitable for use with clojure.core/filter and remove.
 Each state in the fsm definition has a :pass attribute that will be returned from the generated function
 when it is in that state.
 
 The returned function will have the following 2 arities:
  []    - creates a filter with the default accumulator state (nil or the value from :default-acc)
- [val] - accepts an initial value for the accumulator 
+ [val] - accepts an initial value for the accumulator
 
-Parmaters:
+Parameters:
 fsm      - the fsm definition (see below for syntax)
 fsm-opts - the following options are recognised:
   :default-acc val - sets the initial value for the accumulator in the single arity version function
@@ -469,13 +460,13 @@ fsm-opts - the following options are recognised:
     - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
 
 FSM definitions:
-filters's are defined as follows:
+filters are defined as follows:
  [[state {:pass true/false}?
    event -> {:action a-fn}? target-state]
   [target-state ...]]
 
 Where
-  state is a keyword 
+  state is a keyword
   state option (:pass) is optional, it defaults to true
   event is any legal core.match pattern (see https://github.com/clojure/core.match)
   action is optional but must be a function if specified and their return value
@@ -484,20 +475,20 @@ Where
 Event functions are called with (event-fn acc event from-state to-state) where
   acc        - is the current accumulated state
   event      - is the event that fired the transition
-  from-state - the state we're transitionin from
+  from-state - the state we're transitioning from
   to-state   - the state we're transitioning to
 
 Example:
   Suppress numbers after seeing a 3 until we see a 6.
 
-  (def f (fsm-filter [[:initial 
+  (def f (fsm-filter [[:initial
  	               3 -> :suppressing]
  	              [:suppressing {:pass false}
  	               6 -> :initial]]))
 
   (= [1 2 6 1 2] (filter (f) [1 2 3 4 5 1 2 6 1 2]))"
   [states & fsm-opts]
-  (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
+  (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts
 	state-maps  (create-state-maps states)
 	state-fn-names (map state-fn-symbol (map :from-state state-maps))
 	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
@@ -537,7 +528,7 @@ Example:
 	[emitted nil]))))
 
 (defn ^{:skip-wiki true} fsm-seq-impl*
-  "Create a lazy sequence from a fsm-seq state function" 
+  "Create a lazy sequence from a fsm-seq state function"
   [f]
   (let [[emitted next-step] (next-emitted f)]
     (lazy-seq
@@ -548,12 +539,12 @@ Example:
 
 
 (defn- expand-seq-evt-dispatch
-  "Expand the dispatch line for a single fsm-seq dipatch line.
+  "Expand the dispatch line for a single fsm-seq dispatch line.
    The return value corresponds to a single case in a match clause"
   [state-fn-map state-params from-state evt acc evt-map]
   (let [target-state-fn (state-fn-map (:to-state evt-map))
 	target-pass-val (-> evt-map :to-state state-params :pass)
-	new-acc (gensym "new-acc")]       
+	new-acc (gensym "new-acc")]
 
     `[~(:evt evt-map)
       (let [emitted# ~(if (:emit evt-map)
@@ -569,19 +560,18 @@ Example:
   [dispatch-type state-fn-map state-params state]
   (let [this-state-fn  (state-fn-map (:from-state state))
 	acc (gensym "acc")
-	evt (gensym "evt")] 
+	evt (gensym "evt")]
     `(~this-state-fn
       [~acc ~evt]
       (when (seq ~evt)
 	#(~@(expand-dispatch dispatch-type `(first ~evt) acc)
 	 ~@(mapcat (partial expand-seq-evt-dispatch state-fn-map state-params (:from-state state) evt acc) (:transitions state))
-	 :else [::no-event (~this-state-fn ~acc (rest ~evt))]
-	)))))
+	 :else [::no-event (~this-state-fn ~acc (rest ~evt))])))))
 
 ;;===================================================================================================
 ;; We want to turn an fsm-seq definition looking like this:
 ;;
-;;  (fsm-seq 
+;;  (fsm-seq
 ;;   [[:waiting-for-a
 ;;     #".*event a" -> :waiting-for-b]
 ;;    [:waiting-for-b
@@ -604,7 +594,7 @@ Example:
 ;; 	    #(match (first events)
 ;; 		      #".*event b" [::no-event (state-waiting-for-c acc (rest events))]
 ;; 		      #".*event c" [(emit-evt acc (first events)) (state-waiting-for-a acc (rest events))]
-;; 		      :else [::no-event (state-waiting-for-b acc (rest events))])))	
+;; 		      :else [::no-event (state-waiting-for-b acc (rest events))])))
 ;; 	 (state-waiting-for-c
 ;; 	  [acc events]
 ;; 	  (when (seq events)
@@ -627,15 +617,15 @@ The returned function will have the following 2 arities:
  [events]     - accepts a sequence of events
  [val events] - accepts an initial value for the accumulator and a sequence of events.
 
-The generated function will produce a lazy seqnuence that ends when one of the following is true:
+The generated function will produce a lazy sequence that ends when one of the following is true:
  - There are no more events in the event sequence
  - The fsm reaches a terminal state
  - The fsm reaches a state defined by a function and it returns a truthy value
 
-Parmaters:
+Parameters:
  fsm      - the fsm definition (see below for syntax)
  fsm-opts - the following options are recognised:
-  :default-acc val - sets the initial value for the acculator in the single arity version of the function
+  :default-acc val - sets the initial value for the accumulator in the single arity version of the function
   :dispatch - changes the way events are matched, the follow options are accepted:
     - :event-only (default) - events are matched using the  core.match/match syntax against the event only
     - :event-and-acc        - events use the default match syntax and are matched against [acc-value event]
@@ -661,12 +651,12 @@ State and Event Functions:
  Action functions are called with (action-fn acc event from-state to-state) where
    acc        - is the current accumulated state
    event      - is the event that fired the transition
-   from-state - the state we're transitionin from
+   from-state - the state we're transitioning from
    to-state   - the state we're transitioning to
 
 See https://github.com/cdorrat/reduce-fsm for examples and documentation"  
   [states & fsm-opts]
-  (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts 
+  (let [{:keys [dispatch default-acc] :or {dispatch :event-only}} fsm-opts
 	state-maps  (create-state-maps states)
 	state-fn-names (map state-fn-symbol (map :from-state state-maps))
 	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
@@ -682,7 +672,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 
 (defmacro defsm-seq
   "A convenience macro to define an fsm sequence, equivalent to (def fsm-name (fsm-seq states opts)
-   see reduce-fsm/fsm-seq for details"  
+   see reduce-fsm/fsm-seq for details"
   [name states & fsm-opts]
   `(def ~name (fsm-seq ~states ~@fsm-opts)))
 
@@ -707,19 +697,18 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 (defn- graphviz-installed? []
   (if (dot-exists)
     true
-    (do 
+    (do
       (no-graphviz-message)
       false)))
 
 
 (defn- dorothy-edge
-  "Create a single edeg (transition) in a dorothy graph"
+  "Create a single edge (transition) in a dorothy graph"
   [from-state trans]
   (let [label (str  " " (:evt trans)
 		    (when (:action trans)
 		      (str "\\n(" (-> trans :action meta :name str) ")") ))]
-    (vector from-state (:to-state trans) {:label label} )
-    ))
+    (vector from-state (:to-state trans) {:label label} )))
 
 (defn- dorothy-state
   "Create a single dorothy state"
@@ -735,11 +724,11 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
                :fillcolor "grey88"}))]))
 
 (defn- transitions-for-state
-  "return a sequence of dortothy transitions for a single state"
+  "return a sequence of dorothy transitions for a single state"
   [state]
   (letfn [(transition-label [trans idx]
 			    (str
-			     (format "<TABLE BORDER=\"0\"><TR><TD TITLE=\"priority = %d\">%s</TD></TR>" idx (:evt trans) )
+			     (format "<TABLE BORDER=\"0\"><TR><TD TITLE=\"priority = %d\">%s</TD></TR>" idx (:evt trans))
 			     (when (:action trans)
 			       (format "<TR><TD>(%s)</TD></TR>" (:action trans)))
 			     (when (:emit trans)
@@ -755,7 +744,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
   (let [start-state (keyword (gensym "start-state"))
         state-map (->> fsm meta :reduce-fsm/states)
         fsm-type (->> fsm meta :reduce-fsm/fsm-type)]
-    (d/digraph 
+    (d/digraph
       (concat
         [[start-state {:label "start" :style :filled :color :black :shape "point" :width "0.2" :height "0.2"}]]
         (map (partial dorothy-state fsm-type) state-map)
@@ -781,7 +770,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
     "Save the state transition diagram for an fsm as a png.
 Expects the following parameters:
   - fsm      - the fsm to render
-  - filename - the output file for the png." 
+  - filename - the output file for the png."
   [fsm filename]
   (when (graphviz-installed?)
     (d/save! (fsm-dot fsm) filename {:format :png}))

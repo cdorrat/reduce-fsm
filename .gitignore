@@ -1,12 +1,16 @@
 autodoc/**
 lib/**
 pom.xml
+pom.xml.asc
 .#*
-.lein-failures
 multi-lib/**
 *.jar
+*.class
 /target
 /bin
 /classes
 /.classpath
 /.project
+/checkouts
+/.lein-*
+/.nrepl-port

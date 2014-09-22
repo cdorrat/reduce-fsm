@@ -700,7 +700,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 	 (= 0))
     (catch Exception e false)))
 
-(defn- no-grapiz-message []
+(defn- no-graphviz-message []
   (println "The dot executable from graphviz was not found on the path, unable to draw fsm diagrams")
   (println "Download a copy from http://www.graphviz.org/"))
 
@@ -708,7 +708,7 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
   (if (dot-exists)
     true
     (do 
-      (no-grapiz-message)
+      (no-graphviz-message)
       false)))
 
 

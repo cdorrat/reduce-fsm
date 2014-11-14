@@ -356,12 +356,13 @@ Subsequent chained calls to  fsm-event will move the fsm thought it's states.
     `(with-meta
        (fn the-fsm#
          ([] (the-fsm# ~default-acc))
-         ([acc#]
+         ([acc#] (the-fsm# acc# ~(-> state-maps first :from-state)))
+         ([acc# initial#]
             (letfn [~@(map #(inc-state-fn-impl dispatch state-fn-map state-params %) state-maps)]
-              {:state ~(state-disp-name (-> state-maps first :from-state))
+              {:state (~state-disp-name initial#)
                :is-terminated? false
                :value acc#
-               :fsm ~(first state-fn-names)}
+               :fsm (get ~state-fn-map initial#)}
               )))
        ~(fsm-metadata :inc-fsm state-maps))))
 

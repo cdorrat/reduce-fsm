@@ -19,10 +19,10 @@ Events are dispatched with core.match and allow the use of all match features (g
 
 
 ## Usage
-The fastest way to use this library is with Leiningen or Cake. Add the following to your project.clj dependencies:
+The fastest way to use this library is with Leiningen. Add the following to your project.clj dependencies:
 
 ```clojure
-[reduce-fsm "0.1.2"]
+[reduce-fsm "0.1.3"]
 ```
 
 Use via:

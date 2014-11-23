@@ -95,6 +95,10 @@ This package allows you to:
     (sanity-check-fsm state-maps)
     state-maps))
   
+(defn find-state [state-var state-to-find]
+  (if-let [the-state (-> state-var meta ::state-fns state-to-find)]
+    the-state
+    (throw (RuntimeException. (str "Could not find the state \"" state-to-find)) "\"")))
 
 (defn- state-fn-name
   "Create a name for the internal function that will represent this state.
@@ -191,12 +195,16 @@ Parameters:
    :params (:state-params state)
    :transitions  (vec (transitions-metadata state))})
 
-
 (defn- fsm-metadata
   "Create the metadata for the fsm. We'll use this at runtime to draw diagrams of the fsm"
   [fsm-type state-maps]
   {::fsm-type fsm-type
    ::states (vec (map state-metadata state-maps))})
+
+(defn lookup-state [state-fn-map the-state]
+  (if-let [a-state-fn (get state-fn-map the-state)]
+    a-state-fn
+    (throw (RuntimeException. (str "Could not find the state \"" the-state)) "\"")))
 
 ;;===================================================================================================
 ;; We want to turn an fsm definition looking like this:
@@ -231,8 +239,9 @@ Parameters:
 (defmacro fsm
   "Returns an fsm function that reads a sequence of events and returns
 an accumulated value (like reduce). The returned function will have the following 2 arities:
- [events]     - accepts a sequence of events
- [val events] - accepts an initial value for the accumulator and a sequence of events.
+ [events]                   - accepts a sequence of events
+ [val events]               - accepts an initial value for the accumulator and a sequence of events.
+ [initial-state val events] - start the fsm in the specified state with an accumulator value and a sequence of events.
 
 The generated function will return when one of the following is true:
  - There are no more events in the event sequence
@@ -278,14 +287,15 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
 	state-fn-names (map state-fn-symbol (map :from-state state-maps))
 	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name
-    `(with-meta
-       (fn the-fsm#
-	([events#] (the-fsm# ~default-acc events#))
-	([acc# events#]
-	  (letfn [~@(map #(state-fn-impl dispatch state-fn-map state-params %) state-maps)]
-	    (trampoline ~(first state-fn-names) acc# events#)
-	    )))
-       ~(fsm-metadata :fsm state-maps))))
+    `(letfn [~@(map #(state-fn-impl dispatch state-fn-map state-params %) state-maps)]	    
+      (with-meta
+        (fn the-fsm#
+          ([events#] (the-fsm# ~default-acc events#))
+          ([acc# events#]
+             (the-fsm# ~(-> state-maps first :from-state) acc# events#))
+          ([initial-state# acc# events#]
+             (trampoline (lookup-state ~state-fn-map initial-state#) acc# events#)))
+        ~(fsm-metadata :fsm state-maps)))))
 
 (defmacro defsm
   "A convenience macro to define a fsm, equivalent to (def fsm-name (fsm states opts)
@@ -353,18 +363,17 @@ Subsequent chained calls to  fsm-event will move the fsm thought it's states.
 	state-params (zipmap (map :from-state state-maps) (map :state-params state-maps))
 	state-fn-names (map state-fn-symbol (map :from-state state-maps))
 	state-fn-map (zipmap (map :from-state state-maps) state-fn-names)] ;; map of state -> letfn function name
-    `(with-meta
-       (fn the-fsm#
-         ([] (the-fsm# ~default-acc))
-         ([acc#] (the-fsm# acc# ~(-> state-maps first :from-state)))
-         ([acc# initial#]
-            (letfn [~@(map #(inc-state-fn-impl dispatch state-fn-map state-params %) state-maps)]
-              {:state (~state-disp-name initial#)
+    `(letfn [~@(map #(inc-state-fn-impl dispatch state-fn-map state-params %) state-maps)]
+       (with-meta
+         (fn the-fsm#
+           ([] (the-fsm# ~default-acc))
+           ([acc#] (the-fsm# ~(-> state-maps first :from-state) acc#))
+           ([initial-state# acc#]
+              {:state (~state-disp-name initial-state#)
                :is-terminated? false
                :value acc#
-               :fsm (get ~state-fn-map initial#)}
-              )))
-       ~(fsm-metadata :inc-fsm state-maps))))
+               :fsm (lookup-state ~state-fn-map initial-state#)}))
+         ~(fsm-metadata :inc-fsm state-maps)))))
 
 
 (defn fsm-event
@@ -451,6 +460,7 @@ when it is in that state.
 The returned function will have the following 2 arities:
  []    - creates a filter with the default accumulator state (nil or the value from :default-acc)
  [val] - accepts an initial value for the accumulator
+ [initial-state val] - start the fsm in the given state with the specified accumulator value
 
 Parameters:
 fsm      - the fsm definition (see below for syntax)
@@ -498,8 +508,10 @@ Example:
        (with-meta
 	 (fn filter-builder#
 	   ([] (filter-builder# ~default-acc))
-	   ([acc#]
-	      (let [curr-state# (atom (~(first state-fn-names) acc#))]
+           ([acc#]
+              (filter-builder# ~(-> state-maps first :from-state) acc#))
+	   ([initial-state# acc#]
+	      (let [curr-state# (atom ((lookup-state ~state-fn-map initial-state#) acc#))]
 		(fn [evt#]
 		  (let [[pass# next-state#] (@curr-state# evt#)]
 		    (reset! curr-state# next-state#)
@@ -615,8 +627,9 @@ Example:
  (with the :emit option) and may accumulate state in the same way as reduce.
 
 The returned function will have the following 2 arities:
- [events]     - accepts a sequence of events
- [val events] - accepts an initial value for the accumulator and a sequence of events.
+ [events]                    - accepts a sequence of events
+ [val events]                - accepts an initial value for the accumulator and a sequence of events.
+ [initial-state vals events] - start the seq fsm with a given state and accumulator value 
 
 The generated function will produce a lazy sequence that ends when one of the following is true:
  - There are no more events in the event sequence
@@ -666,9 +679,11 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
        (with-meta
 	 (fn fsm-seq-fn#
 	   ([events#] (fsm-seq-fn# ~default-acc events#))
-	   ([acc# events#]
+           ([acc# events#]
+              (fsm-seq-fn# ~(-> state-maps first :from-state) acc# events#))
+	   ([initial-state# acc# events#]
 	      (when (seq events#)
-		(fsm-seq-impl* (~(first state-fn-names) acc# events#)))))
+		(fsm-seq-impl* ((lookup-state ~state-fn-map initial-state#)  acc# events#)))))
 	 ~(fsm-metadata :fsm-seq state-maps)))))
 
 (defmacro defsm-seq

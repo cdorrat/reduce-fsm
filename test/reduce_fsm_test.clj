@@ -21,7 +21,13 @@
   (are [res acc events] (= res (log-search-fsm-test acc events))       
        ["5 event c"]  []  ["1 event a" "event x" "2 event b" "3 event c" "4 event a" "event x" "5 event c" "6 event a"]
        nil nil ["0 event c" "1 event a" "2 event b" "3 event c"]
-       [] [] ["0 event c" "1 event a" "2 event b" "3 event c" ]))
+       [] [] ["0 event c" "1 event a" "2 event b" "3 event c" ])
+
+  (testing "can specify initial states"
+    (is  (= [] (log-search-fsm-test :waiting-for-c []  ["4 event a" "event x" "5 event c" "6 event a"]))))
+  
+  (testing "invalid initial states throw"
+    (is (thrown? RuntimeException (log-search-fsm-test :i-dont-exist []  ["4 event a" "event x" "5 event c" "6 event a"])))))
    
 
 (deftest dispatch-with-acc
@@ -38,6 +44,7 @@
        ["5 event c"]  []  ["1 event a" "event x" "2 event b" "3 event c" "4 event a" "event x" "5 event c" "6 event a"]
        nil nil ["0 event c" "1 event a" "2 event b" "3 event c"]
        [] [] ["0 event c" "1 event a" "2 event b" "3 event c" ])
+  
   ))
 
 (deftest single-dispatch-with-when
@@ -87,6 +94,20 @@
 	 ["5 event c"]  ["1 event a" "event x" "2 event b" "3 event c" "4 event a" "event x" "5 event c" "6 event a"]
 	 []  ["1 event a" "2 event b" "3 event c"]
 	 ["2 event c" "4 event c"]  ["x na-event" "1 event a" "2 event c" "3 event a" "4 event c"])))
+
+
+(deftest simple-fsm-seq-with-initial-state
+  (let [emit-evt (fn [acc evt] evt)
+	log-seq (fsm-seq 
+		 [[:waiting-for-a
+		   #".*event a" -> :waiting-for-b]
+		  [:waiting-for-b
+		   #".*event b" -> :waiting-for-c
+		   #".*event c" -> {:emit emit-evt} :waiting-for-a]
+		  [:waiting-for-c
+		   #".*event c" -> :waiting-for-a]])]
+
+    (is (= [] (doall (log-seq :waiting-for-c  [] ["4 event a" "event x" "5 event c" "6 event a"]))))))
   
 ;;===================================================================================================
 ;; fsm-filter tests
@@ -97,6 +118,13 @@
 			      [:suppressing {:pass false}
 			       6 -> :initial]])]
     (is (= [1 2 6 1 2] (filter (a-filter) [1 2 3 4 5 1 2 6 1 2])))))
+
+(deftest simple-fsm-filter-with-inital-state
+  (let [a-filter (fsm-filter [[:initial {:pass true}
+			       3 -> :suppressing]
+			      [:suppressing {:pass false}
+			       6 -> :initial]])]
+    (is (= [6 1 2] (filter (a-filter :suppressing nil) [1 2 3 4 5 1 2 6 1 2])))))
 
 (deftest fsm-filter-with-default-pass
   (let [a-filter (fsm-filter [[:initial
@@ -170,6 +198,20 @@
     (is (= :waiting-for-a (:state @fsm-state)))
 
     (swap! fsm-state fsm-event \a)
+    (is (= :waiting-for-b (:state @fsm-state)))
+
+    (swap! fsm-state fsm-event \b)
+    (is (= :done (:state @fsm-state)))))
+
+(deftest incremental-fsm-with-initial-state
+  (let [an-fsm (fsm-inc [[:waiting-for-a
+                       \a -> :waiting-for-b]
+                      [:waiting-for-b
+                       \b -> :done
+                       _ -> :waiting-for-a]
+                      [:done {:is-terminal true}]])
+        fsm-state (atom (an-fsm :waiting-for-b nil))]
+
     (is (= :waiting-for-b (:state @fsm-state)))
 
     (swap! fsm-state fsm-event \b)

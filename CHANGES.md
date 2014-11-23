@@ -1,3 +1,6 @@
+*Version 0.1.3*
+  - support for specifying the initial state of the fsm at runtime
+  
 *Version 0.1.0*
 
 - Added support for incremental finite state machines. These allow you to provide events via a function call instead of a sequence.

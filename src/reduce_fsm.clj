@@ -95,10 +95,6 @@ This package allows you to:
     (sanity-check-fsm state-maps)
     state-maps))
   
-(defn find-state [state-var state-to-find]
-  (if-let [the-state (-> state-var meta ::state-fns state-to-find)]
-    the-state
-    (throw (RuntimeException. (str "Could not find the state \"" state-to-find)) "\"")))
 
 (defn- state-fn-name
   "Create a name for the internal function that will represent this state.

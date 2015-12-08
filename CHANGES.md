@@ -1,3 +1,7 @@
+*Version 0.1.4*
+  - Fix Issue #9 - invalid excpetion call breaks Clojure 1.8 compatability.
+  - Bumped dependencies for clojure -> 1.7.0 & core.match -> 0.2.2
+
 *Version 0.1.3*
   - support for specifying the initial state of the fsm at runtime
   

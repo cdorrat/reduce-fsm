@@ -200,7 +200,7 @@ Parameters:
 (defn lookup-state [state-fn-map the-state]
   (if-let [a-state-fn (get state-fn-map the-state)]
     a-state-fn
-    (throw (RuntimeException. (str "Could not find the state \"" the-state)) "\"")))
+    (throw (RuntimeException. (str "Could not find the state \"" the-state "\"")))))
 
 ;;===================================================================================================
 ;; We want to turn an fsm definition looking like this:

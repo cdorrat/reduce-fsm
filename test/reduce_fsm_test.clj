@@ -1,7 +1,6 @@
-(ns reduce-fsm-test  
-  (:use [clojure.test])
-  (:use [reduce-fsm])
-  (:import [java.awt.Frame]))
+(ns reduce-fsm-test
+  (:require [clojure.test :refer :all]
+            [reduce-fsm :refer :all]))
 
 (defn- test-save-line [state evt from-state to-state]
   (conj state evt))
@@ -293,3 +292,16 @@
          [1 1 2] 1        ;;  (the number of even events)
          [1 2 2 4] 100)))  ;; 0 (we transitioned to next state)
   
+
+(deftest namespaced-state-keywords-preserved
+  "Incremental FSMs must keep namespaced keywords as :state (not strip to name)."
+  (let [an-fsm (fsm-inc [[:entity/idle
+                          :go -> :entity/busy]
+                         [:entity/busy
+                          :stop -> :entity/idle]])
+        st (atom (an-fsm))]
+    (is (= :entity/idle (:state @st)))
+    (swap! st fsm-event :go)
+    (is (= :entity/busy (:state @st)))
+    (swap! st fsm-event :stop)
+    (is (= :entity/idle (:state @st)))))

@@ -302,7 +302,10 @@ See https://github.com/cdorrat/reduce-fsm for examples and documentation"
 ;;===================================================================================================
 ;; support for incremental fsms
 (defn- state-disp-name [sym]
-  (keyword (state-fn-name sym)))
+  ;; Public :state id — keep namespaced keywords (do not (keyword (name …))).
+  (if (keyword? sym)
+    sym
+    (keyword (state-fn-name sym))))
 
 (defn- expand-inc-evt-dispatch
   "Expand the dispatch of a single event for incremental fsms, this corresponds to a single case in the match expression.
